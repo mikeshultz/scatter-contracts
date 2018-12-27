@@ -1,4 +1,4 @@
-pragma solidity ^0.4.25;
+pragma solidity ^0.5.2;
 
 import './SafeMath.sol';
 import './Env.sol';
@@ -52,6 +52,10 @@ contract SkatterBid {
     uint remainderFunds;
 
     bytes32 constant EMPTY_IPFS_FILE = 0xbfccda787baba32b59c78450ac3d20b633360b43992c77289f9ed46d843561e6;
+    bytes32 constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
+    bytes32 constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
+    bytes32 constant ENV_MIN_DURATION = keccak256("minDuration");
+    bytes32 constant ENV_MIN_BID = keccak256("minBid");
 
     modifier ownerOnly() { require(msg.sender == owner, "denied"); _; }
     modifier notBanned() { require(!env.isBanned(msg.sender), "banned"); _; }
@@ -69,7 +73,7 @@ contract SkatterBid {
     function isBidOpen(int64 bidId) public view
     returns (bool)
     {
-        uint acceptWait = env.getuint("acceptHoldDuration");
+        uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
         return (
             bids[bidId].fileHash != bytes32(0)
             && bids[bidId].pinned == 0
@@ -193,7 +197,7 @@ contract SkatterBid {
     returns (bool)
     {
         // Use the minimum validations default from the Env contract
-        uint minValid = env.getuint("defaultMinValidations");
+        uint minValid = env.getuint(ENV_DEFAULT_MIN_VALIDATIONS);
         return bid(fileHash, fileSize, durationSeconds, bidValue, validationPool,int16(minValid));
     }
 
@@ -223,7 +227,7 @@ contract SkatterBid {
             return false;
         }
 
-        uint minDuration = env.getuint('minDuration');
+        uint minDuration = env.getuint(ENV_MIN_DURATION);
         if (durationSeconds < minDuration) // IPFS hash of a zero-length file
         {
             emit BidInvalid(fileHash, "duration low");
@@ -236,7 +240,7 @@ contract SkatterBid {
             return false;
         }
 
-        if (bidValue < env.getuint("minBid"))
+        if (bidValue < env.getuint(ENV_MIN_BID))
         {
             emit BidTooLow(fileHash);
             return false;
@@ -271,7 +275,7 @@ contract SkatterBid {
     returns (bool)
     {
 
-        uint acceptWait = env.getuint("acceptHoldDuration");
+        uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
         if (now - bids[bidId].accepted < acceptWait)
         {
             emit AcceptWait(now - bids[bidId].accepted);
@@ -317,7 +321,8 @@ contract SkatterBid {
         addValidation(bidId, false);
     }
 
-    function dispurse(int64 bidId) public notBanned
+    // TODO: Maybe just do withdrawls?
+    /*function dispurse(int64 bidId) public notBanned
     {
         if (!satisfied(bidId))
         {
@@ -346,6 +351,6 @@ contract SkatterBid {
             remainderFunds += remainder;
         }
 
-    }
+    }*/
 
 }
