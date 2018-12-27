@@ -1,46 +1,53 @@
-pragma solidity ^0.4.25;
-
+pragma solidity ^0.5.2;
 
 contract Env {
 
-    address owner;
-    mapping (string => string) var_strings;
-    mapping (string => uint32) var_uints;
-    mapping (address => bool) banned;
+    address public owner;
+    mapping (bytes32 => string) internal var_strings;
+    mapping (bytes32 => uint) internal var_uints;
+    mapping (address => bool) internal banned;
 
-    modifier ownerOnly() { require(msg.sender == owner, "denied"); _; }
+    modifier ownerOnly() {
+        require(msg.sender == owner, "denied");
+        _;
+    }
+
+    bytes32 constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
+    bytes32 constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
+    bytes32 constant ENV_MIN_DURATION = keccak256("minDuration");
+    bytes32 constant ENV_MIN_BID = keccak256("minBid");
 
     constructor() public
     {
         owner = msg.sender;
 
         // Presets
-        var_uints["minBid"] = 0;
-        var_uints["defaultMinValidations"] = 2;
-        var_uints["minDuration"] = 1 weeks;
-        var_uints["acceptHoldDuration"] = 15 minutes;
+        var_uints[ENV_MIN_BID] = 0;
+        var_uints[ENV_DEFAULT_MIN_VALIDATIONS] = 2;
+        var_uints[ENV_MIN_DURATION] = 1 weeks;
+        var_uints[ENV_ACCEPT_HOLD_DURATION] = 15 minutes;
 
         banned[0x0000000000000000000000000000000000000000] = true;
     }
 
-    function setstr(string key, string value) public ownerOnly
+    function setstr(bytes32 keyHash, string memory value) public ownerOnly
     {
-        var_strings[key] = value;
+        var_strings[keyHash] = value;
     }
 
-    function getstr(string key) public view returns (string)
+    function getstr(bytes32 keyHash) public view returns (string memory)
     {
-        return var_strings[key];
+        return var_strings[keyHash];
     }
 
-    function setuint(string key, uint32 value) public ownerOnly
+    function setuint(bytes32 keyHash, uint value) public ownerOnly
     {
-        var_uints[key] = value;
+        var_uints[keyHash] = value;
     }
 
-    function getuint(string key) public view returns (uint32)
+    function getuint(bytes32 keyHash) public view returns (uint)
     {
-        return var_uints[key];
+        return var_uints[keyHash];
     }
 
     function ban(address _addr) public ownerOnly

@@ -10,3 +10,6 @@ infura-mainnet:
 geth:
   type: ipc
   file: ~/.ethereum/geth.ipc
+
+test:
+  type: eth_tester
