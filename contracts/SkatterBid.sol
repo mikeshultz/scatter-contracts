@@ -26,7 +26,7 @@ contract SkatterBid {
         bool paid;
         address payable hoster;
         uint pinned;
-        int16 minValidations;
+        int16 minValidations;  // Also, kind of, minimum majority (e.g. win by X)
         Validation[] validations;
     }
 
@@ -77,7 +77,31 @@ contract SkatterBid {
      * Utility
      */
 
-    function isBidOpen(int64 bidId) public view
+    function isBidOpenForPin(int64 bidId, address hoster) public view
+    returns (bool)
+    {
+        uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
+        return (
+            bids[bidId].fileHash != bytes32(0)
+            && bids[bidId].pinned == 0
+            && (
+                bids[bidId].accepted == 0
+                || now - uint(bids[bidId].accepted) >= acceptWait
+                || (
+                    now - uint(bids[bidId].accepted) < acceptWait
+                    && bids[bidId].hoster == hoster
+                )
+            )
+        );
+    }
+
+    function isBidOpenForPin(int64 bidId) public view
+    returns (bool)
+    {
+        return isBidOpenForPin(bidId, msg.sender);
+    }
+
+    function isBidOpenForAccept(int64 bidId, address hoster) public view
     returns (bool)
     {
         uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
@@ -85,8 +109,14 @@ contract SkatterBid {
             bids[bidId].fileHash != bytes32(0)
             && bids[bidId].pinned == 0
             && (bids[bidId].accepted == 0 || now - uint(bids[bidId].accepted) >= acceptWait)
-            && bids[bidId].bidder != msg.sender
+            && bids[bidId].bidder != hoster
         );
+    }
+
+    function isBidOpenForAccept(int64 bidId) public view
+    returns (bool)
+    {
+        return isBidOpenForAccept(bidId, msg.sender);
     }
 
     function validationSway(int64 bidId) public view returns (uint)
@@ -122,9 +152,8 @@ contract SkatterBid {
             return false;
         }
         
-        uint majoritySway = uint(bids[bidId].minValidations) / sway;
-
-        return(uint(-1) <= majoritySway && majoritySway <= uint(1)); // Must be a simple majority or better
+        // Must be a simple majority of minValidations or better
+        return(sway >= uint(bids[bidId].minValidations));
     }
 
     function addValidation(int64 bidId, bool isValid)
@@ -176,7 +205,7 @@ contract SkatterBid {
         // TODO: Test this with thousands(or more) bids
         for (int64 i=0; i<bidCount; i++)
         {
-            if (isBidOpen(i))
+            if (isBidOpenForAccept(i))
             {
                 return (i, bids[i].fileHash, bids[i].fileSize);
             }
@@ -305,8 +334,7 @@ contract SkatterBid {
     returns (bool)
     {
 
-        uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
-        if (now - bids[bidId].accepted < acceptWait)
+        if (!isBidOpenForAccept(bidId))
         {
             emit AcceptWait(now - bids[bidId].accepted);
             return false;
@@ -326,7 +354,7 @@ contract SkatterBid {
     {
         require(bids[bidId].pinned == 0, "already pinned");
 
-        if (msg.sender != bids[bidId].hoster)
+        if (!isBidOpenForPin(bidId))
         {
             emit NotAcceptedByPinner(bidId, bids[bidId].hoster);
             return false;
