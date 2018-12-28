@@ -10,8 +10,9 @@ contract SkatterBid {
     struct Validation {
         int64 bidId;
         uint when;
-        address validator;
+        address payable validator;
         bool isValid;
+        bool paid;
     }
 
     struct Bid {
@@ -22,9 +23,9 @@ contract SkatterBid {
         uint validationPool;
         uint duration;
         uint accepted;
-        address hoster;
-        uint pinned;
         bool paid;
+        address payable hoster;
+        uint pinned;
         int16 minValidations;
         Validation[] validations;
     }
@@ -33,7 +34,9 @@ contract SkatterBid {
         int64 indexed bidId,
         address indexed bidder,
         uint indexed bidValue,
-        bytes32 fileHash
+        uint validationPool,
+        bytes32 fileHash,
+        int64 fileSize
     );
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
@@ -41,15 +44,19 @@ contract SkatterBid {
     event AcceptWait(uint waitLeft);
     event Pinned(int64 indexed bidId, address indexed hoster, bytes32 fileHash);
     event NotAcceptedByPinner(int64 indexed bidId, address indexed hoster);
-    event DispurseFailed(int64 indexed bidId, address indexed sender);
+    event WithdrawFailed(int64 indexed bidId, address indexed sender, string reason);
+    event WithdrawDuplicate(int64 indexed bidId, address indexed sender);
+    event WithdrawHoster(int64 indexed bidId, address indexed hoster);
+    event WithdrawValidator(int64 indexed bidId, address indexed validator);
     event ValidationOcurred(int64 indexed bidId, address indexed validator, bool indexed isValid);
+    event GeneralError(string why);
 
-    address owner;
-    Env env;
+    address public owner;
+    Env public env;
 
-    int64 bidCount;
+    int64 public bidCount;
     mapping(int64 => Bid) bids;
-    uint remainderFunds;
+    uint public remainderFunds;
 
     bytes32 constant EMPTY_IPFS_FILE = 0xbfccda787baba32b59c78450ac3d20b633360b43992c77289f9ed46d843561e6;
     bytes32 constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
@@ -129,7 +136,8 @@ contract SkatterBid {
             bidId,
             now,
             msg.sender,
-            isValid
+            isValid,
+            false
         );
 
         bids[bidId].validations.push(validation);
@@ -140,6 +148,27 @@ contract SkatterBid {
     /**
      * Readers
      */
+
+    function getBid(int64 bidId) public view returns (
+        address,
+        bytes32,
+        int64,
+        uint,
+        uint,
+        uint,
+        int16
+    )
+    {
+        return(
+            bids[bidId].bidder,
+            bids[bidId].fileHash,
+            bids[bidId].fileSize,
+            bids[bidId].bidAmount,
+            bids[bidId].validationPool,
+            bids[bidId].duration,
+            bids[bidId].minValidations
+        );
+    }
 
     function getJob() public view returns (int64, bytes32, int64)
     {
@@ -156,14 +185,15 @@ contract SkatterBid {
     }
 
     function getValidation(int64 bidId, uint idx) public view
-    returns (int64, uint, address, bool)
+    returns (int64, uint, address, bool, bool)
     {
         Validation memory v = bids[bidId].validations[idx];
         return (
             v.bidId,
             v.when,
             v.validator,
-            v.isValid
+            v.isValid,
+            v.paid
         );
     }
 
@@ -213,6 +243,8 @@ contract SkatterBid {
     payable
     returns (bool)
     {
+
+        bidCount++;
 
         // Input Validation
         if (fileHash == bytes32(0) || fileSize < 1)
@@ -264,9 +296,7 @@ contract SkatterBid {
         bids[bidId].minValidations = minValidations;
         bids[bidId].duration = durationSeconds;
 
-        emit BidSuccessful(bidId, msg.sender, bidValue, fileHash);
-
-        bidCount++;
+        emit BidSuccessful(bidId, msg.sender, bidValue, validationPool, fileHash, fileSize);
 
         return true;
     }
@@ -321,36 +351,92 @@ contract SkatterBid {
         addValidation(bidId, false);
     }
 
-    // TODO: Maybe just do withdrawls?
-    /*function dispurse(int64 bidId) public notBanned
+    function validatorIndex(int64 bidId, address validator) public view returns (uint)
     {
-        if (!satisfied(bidId))
+
+        if (bids[bidId].validations.length < 1)
         {
-            emit DispurseFailed(bidId, msg.sender);
-            return;
+            return uint(-1);
         }
-
-        bids[bidId].paid = true;
-
-        uint split;
-        uint remainder;
-        (split, remainder) = SkatterRewards.getSplitAndRemainder(
-            bids[bidId].validationPool,
-            bids[bidId].validations.length
-        );
 
         for (uint i=0; i<bids[bidId].validations.length; i++)
         {
-            bids[bidId].validations[i].validator.transfer(split);
+            if (validator == bids[bidId].validations[i].validator)
+            {
+                return i;
+            }
         }
 
-        bids[bidId].hoster.transfer(bids[bidId].bidAmount);
-        
-        if (remainder > 0)
+        return uint(-1);
+
+    }
+
+    function withdraw(int64 bidId) public notBanned
+    {
+        uint validatorIdx = validatorIndex(bidId, msg.sender);
+
+        // Withdraw for a validator
+        if (validatorIdx > uint(-1))
         {
-            remainderFunds += remainder;
+            if (bids[bidId].validations[validatorIdx].paid)
+            {
+                emit WithdrawFailed(bidId, msg.sender, "already paid");
+                return;
+            }
+
+            if (bids[bidId].validationPool < 1)
+            {
+                emit WithdrawFailed(bidId, msg.sender, "nothing to withdraw");
+                return;
+            }
+
+            uint split;
+            uint remainder;
+            (split, remainder) = SkatterRewards.getSplitAndRemainder(
+                bids[bidId].validationPool,
+                bids[bidId].validations.length
+            );
+
+            assert(split > 0);
+            assert(
+                (bids[bidId].validations.length == 1 && split == bids[bidId].validationPool)
+                || (bids[bidId].validations.length > 1 && split < bids[bidId].validationPool)
+            );
+
+            bids[bidId].validations[validatorIdx].paid = true;
+
+            msg.sender.transfer(split);
+
+            if (remainder > 0)
+            {
+                remainderFunds += remainder;
+            }
+
+            emit WithdrawValidator(bidId, msg.sender);
+        }
+        // Or a hoster
+        else if (bids[bidId].hoster == msg.sender)
+        {
+            assert(bids[bidId].bidAmount > 0);
+            assert(address(this).balance > 0);
+
+            if (bids[bidId].paid)
+            {
+                emit GeneralError("already paid");
+                return;
+            }
+
+            bids[bidId].paid = true;
+            bids[bidId].hoster.transfer(bids[bidId].bidAmount);
+
+            emit WithdrawHoster(bidId, msg.sender);
+        }
+        // This user shouldn't be submitting
+        else
+        {
+            emit WithdrawFailed(bidId, msg.sender, "invalid widthrawer");
         }
 
-    }*/
+    }
 
 }
