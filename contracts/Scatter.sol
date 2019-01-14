@@ -1,15 +1,16 @@
 pragma solidity ^0.5.2;
 
-import "./interface/IScatterRouter.sol";
+import "./interface/IRouter.sol";
 import "./interface/IScatter.sol";
 
 import "./lib/Owned.sol";
 import "./lib/SafeMath.sol";
 import "./lib/Structures.sol";
-import "./lib/ScatterRewards.sol";
+import "./lib/Rewards.sol";
 
 import "./storage/Env.sol";
 import "./storage/BidStore.sol";
+
 
 contract Scatter is Owned {  /// interface: IScatter
     using SafeMath for uint;
@@ -401,13 +402,13 @@ contract Scatter is Owned {  /// interface: IScatter
         uint validationPool = bidStore.getValidationPool(bidId);
 
         // Payout
-        uint amountPaid = ScatterRewards.payValidators(address(bidStore), bidId, balanceSheet);
+        uint amountPaid = Rewards.payValidators(address(bidStore), bidId, balanceSheet);
         uint remainder = validationPool - amountPaid;
         if (remainder > 0)
         {
             remainderFunds += remainder;
         }
-        ScatterRewards.payHoster(address(bidStore), bidId, balanceSheet);
+        Rewards.payHoster(address(bidStore), bidId, balanceSheet);
 
         bytes32 fileHash = bidStore.getFileHash(bidId);
         emit Pinned(bidId, msg.sender, fileHash);
@@ -492,7 +493,7 @@ contract Scatter is Owned {  /// interface: IScatter
 
             uint split;
             uint remainder;
-            (split, remainder) = ScatterRewards.getSplitAndRemainder(
+            (split, remainder) = Rewards.getSplitAndRemainder(
                 bids[bidId].validationPool,
                 bids[bidId].validations.length
             );

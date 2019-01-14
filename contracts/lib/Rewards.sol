@@ -1,13 +1,14 @@
 pragma solidity ^0.5.2;
 
-import './SafeMath.sol';
-import './Structures.sol';
-import '../interface/IBidStore.sol';
+import "./SafeMath.sol";
+import "./Structures.sol";
+import "../interface/IBidStore.sol";
 
-library ScatterRewards {
+
+library Rewards {
     using SafeMath for uint;
 
-    uint constant MAX_UINT = 2**256 - 1;
+    uint private constant MAX_UINT = 2**256 - 1;
 
     function getSplitAndRemainder(uint poolValue, uint validationCount)
     public pure
@@ -34,7 +35,7 @@ library ScatterRewards {
             validatorCount
         );
 
-        for (uint i=0; i<validatorCount; i++)
+        for (uint i = 0; i < validatorCount; i++)
         {
             address payable validator = store.getValidator(bidId, i);
             require(store.setValidatorPaid(bidId, i), "set paid failed");
