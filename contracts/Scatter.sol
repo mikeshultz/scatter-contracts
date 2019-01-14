@@ -39,15 +39,16 @@ contract Scatter is Owned {  /// interface: IScatter
     IBidStore public bidStore;
 
     int public bidCount;
-    mapping(int => Structures.Bid) bids;
-    mapping(address => uint) balanceSheet;
+    mapping(int => Structures.Bid) private bids;
+    mapping(address => uint) private balanceSheet;
     uint public remainderFunds;
 
-    bytes32 constant EMPTY_IPFS_FILE = 0xbfccda787baba32b59c78450ac3d20b633360b43992c77289f9ed46d843561e6;
-    bytes32 constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
-    bytes32 constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
-    bytes32 constant ENV_MIN_DURATION = keccak256("minDuration");
-    bytes32 constant ENV_MIN_BID = keccak256("minBid");
+    // solhint-disable-next-line max-line-length
+    bytes32 private constant EMPTY_IPFS_FILE = 0xbfccda787baba32b59c78450ac3d20b633360b43992c77289f9ed46d843561e6;
+    bytes32 private constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
+    bytes32 private constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
+    bytes32 private constant ENV_MIN_DURATION = keccak256("minDuration");
+    bytes32 private constant ENV_MIN_BID = keccak256("minBid");
 
     modifier notBanned() { require(!env.isBanned(msg.sender), "banned"); _; }
     modifier notLocked() { require(!env.isBanned(msg.sender), "banned"); _; }
@@ -70,16 +71,6 @@ contract Scatter is Owned {  /// interface: IScatter
         bytes32 fileHash = bidStore.getFileHash(bidId);
         uint accepted = bidStore.getAccepted(bidId);
         address hoster = bidStore.getHoster(bidId);
-
-        /*(
-            address bidder,
-            bytes32 fileHash,
-            int fileSize,
-            uint bidAmount,
-            uint validationPool,
-            uint duration,
-            int16 minValid
-        ) = bidStore.getBid(bidId);*/
 
         return (
             fileHash != bytes32(0)
@@ -126,7 +117,7 @@ contract Scatter is Owned {  /// interface: IScatter
     {
         uint total = bidStore.getValidationCount(bidId);
         uint sway = 0;
-        for (uint i=0; i<total; i++)
+        for (uint i = 0; i < total; i++)
         {
             if (bidStore.getValidationIsValid(bidId, i))
             {
@@ -348,15 +339,6 @@ contract Scatter is Owned {  /// interface: IScatter
                                       validationPool, minValidations,
                                       durationSeconds);
 
-        // Store the bid
-        /*bids[bidId].bidder = msg.sender;
-        bids[bidId].fileHash = fileHash;
-        bids[bidId].fileSize = fileSize;
-        bids[bidId].bidAmount = bidValue;
-        bids[bidId].validationPool = validationPool;
-        bids[bidId].minValidations = minValidations;
-        bids[bidId].duration = durationSeconds;*/
-
         emit BidSuccessful(bidId, msg.sender, bidValue, validationPool, fileHash, fileSize);
 
         return true;
@@ -371,10 +353,6 @@ contract Scatter is Owned {  /// interface: IScatter
             emit AcceptWait(now - bids[bidId].accepted);
             return false;
         }
-
-        // Set the accepted timer
-        /*bids[bidId].accepted = now;
-        bids[bidId].hoster = msg.sender;*/
 
         require(bidStore.setAcceptNow(bidId, msg.sender), "accept error");
 
@@ -393,9 +371,6 @@ contract Scatter is Owned {  /// interface: IScatter
             emit NotAcceptedByPinner(bidId, bids[bidId].hoster);
             return false;
         }
-
-        /*bids[bidId].pinned = now;
-        bids[bidId].hoster = msg.sender;*/
 
         require(bidStore.setPinned(bidId, msg.sender), "accept error");
 
@@ -471,74 +446,5 @@ contract Scatter is Owned {  /// interface: IScatter
     {
         transfer(msg.sender);
     }
-
-    /*function withdraw(int64 bidId) public notBanned
-    {
-        uint validatorIdx = validatorIndex(bidId, msg.sender);
-
-        // Withdraw for a validator
-        if (validatorIdx > uint(-1))
-        {
-            if (bids[bidId].validations[validatorIdx].paid)
-            {
-                emit WithdrawFailed(bidId, msg.sender, "already paid");
-                return;
-            }
-
-            if (bids[bidId].validationPool < 1)
-            {
-                emit WithdrawFailed(bidId, msg.sender, "nothing to withdraw");
-                return;
-            }
-
-            uint split;
-            uint remainder;
-            (split, remainder) = Rewards.getSplitAndRemainder(
-                bids[bidId].validationPool,
-                bids[bidId].validations.length
-            );
-
-            assert(split > 0);
-            assert(
-                (bids[bidId].validations.length == 1 && split == bids[bidId].validationPool)
-                || (bids[bidId].validations.length > 1 && split < bids[bidId].validationPool)
-            );
-
-            bids[bidId].validations[validatorIdx].paid = true;
-
-            msg.sender.transfer(split);
-
-            if (remainder > 0)
-            {
-                remainderFunds += remainder;
-            }
-
-            emit WithdrawValidator(bidId, split, msg.sender);
-        }
-        // Or a hoster
-        else if (bids[bidId].hoster == msg.sender)
-        {
-            //assert(bids[bidId].bidAmount > 0);
-            //assert(address(this).balance > 0);
-            require(address(this).balance > 0, "no money");
-
-            if (bids[bidId].paid)
-            {
-                emit WithdrawFailed(bidId, msg.sender, "already paid");
-                return;
-            }
-
-            bids[bidId].paid = true;
-            bids[bidId].hoster.transfer(bids[bidId].bidAmount);
-
-            emit WithdrawHoster(bidId, bids[bidId].bidAmount, msg.sender);
-        }
-        // This user shouldn't be submitting
-        else
-        {
-            emit WithdrawFailed(bidId, msg.sender, "invalid widthrawer");
-        }
-
-    }*/
 
 }
