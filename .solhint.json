@@ -1,0 +1,11 @@
+{                                              
+    "extends": "default",                      
+    "rules": {
+        "compiler-fixed": false,
+        "separate-by-one-line-in-contract": "warn",
+        "bracket-align": false,
+        "indent": ["error", 4],                
+        "quotes": ["error", "double"],         
+        "max-line-length": ["error", 100]      
+    }                                          
+}                                              
