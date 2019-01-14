@@ -1,0 +1,28 @@
+{
+  "contracts": [
+    {
+      "name": "Env",
+      "networks": {}
+    },
+    {
+      "name": "SafeMath",
+      "networks": {}
+    },
+    {
+      "name": "SkatterRewards",
+      "networks": {}
+    },
+    {
+      "name": "SkatterBid",
+      "networks": {}
+    },
+    {
+      "name": "BidStore",
+      "networks": {}
+    }
+  ],
+  "seenAccounts": [
+    "0x208B6e328105148Baf90C5d6a8F65A0accd17A95"
+  ],
+  "defaultAccount": "0x208B6e328105148Baf90C5d6a8F65A0accd17A95"
+}
