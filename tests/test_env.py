@@ -97,9 +97,6 @@ def test_env_str(web3, contracts):
 
     assert env is not None, "env contract missing"
 
-    print("!@#$!@#$!@#$: {}".format(std_tx({
-            'from': admin,
-        })))
     set_txhash = env.functions.setstr(STR_HASH_1, STR_VAL_1).transact(std_tx({
             'from': admin,
         }))
