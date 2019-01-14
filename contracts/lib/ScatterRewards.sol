@@ -4,7 +4,7 @@ import './SafeMath.sol';
 import './Structures.sol';
 import '../interface/IBidStore.sol';
 
-library SkatterRewards {
+library ScatterRewards {
     using SafeMath for uint;
 
     uint constant MAX_UINT = 2**256 - 1;

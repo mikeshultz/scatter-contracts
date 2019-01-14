@@ -1,17 +1,17 @@
 pragma solidity ^0.5.2;
 
-import './interface/ISkatterRouter.sol';
-import './interface/ISkatterBid.sol';
+import './interface/IScatterRouter.sol';
+import './interface/IScatterBid.sol';
 
 import './lib/Owned.sol';
 import './lib/SafeMath.sol';
 import './lib/Structures.sol';
-import './lib/SkatterRewards.sol';
+import './lib/ScatterRewards.sol';
 
 import './storage/Env.sol';
 import './storage/BidStore.sol';
 
-contract SkatterBid is Owned {  /// interface: ISkatterBid
+contract ScatterBid is Owned {  /// interface: IScatterBid
     using SafeMath for uint;
 
     event BidSuccessful(
@@ -401,13 +401,13 @@ contract SkatterBid is Owned {  /// interface: ISkatterBid
         uint validationPool = bidStore.getValidationPool(bidId);
 
         // Payout
-        uint amountPaid = SkatterRewards.payValidators(address(bidStore), bidId, balanceSheet);
+        uint amountPaid = ScatterRewards.payValidators(address(bidStore), bidId, balanceSheet);
         uint remainder = validationPool - amountPaid;
         if (remainder > 0)
         {
             remainderFunds += remainder;
         }
-        SkatterRewards.payHoster(address(bidStore), bidId, balanceSheet);
+        ScatterRewards.payHoster(address(bidStore), bidId, balanceSheet);
 
         bytes32 fileHash = bidStore.getFileHash(bidId);
         emit Pinned(bidId, msg.sender, fileHash);
@@ -492,7 +492,7 @@ contract SkatterBid is Owned {  /// interface: ISkatterBid
 
             uint split;
             uint remainder;
-            (split, remainder) = SkatterRewards.getSplitAndRemainder(
+            (split, remainder) = ScatterRewards.getSplitAndRemainder(
                 bids[bidId].validationPool,
                 bids[bidId].validations.length
             );

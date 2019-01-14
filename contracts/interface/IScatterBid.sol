@@ -1,6 +1,6 @@
 pragma solidity >=0.4.0 <0.6.0;
 
-interface ISkatterBid {
+interface IScatterBid {
 
     /* Are structs useful in interface?
     struct Validation {

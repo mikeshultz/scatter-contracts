@@ -9,12 +9,12 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
 
     int public bidCount;
     mapping(int => Structures.Bid) private bids;
-    address public skatterBidAddress;
+    address public scatterBidAddress;
 
-    modifier skatterBidOnly() { require(msg.sender == skatterBidAddress, "not allowed"); _; }
+    modifier scatterBidOnly() { require(msg.sender == scatterBidAddress, "not allowed"); _; }
 
-    constructor(address _skatterBid) public {
-        skatterBidAddress = _skatterBid;
+    constructor(address _scatterBid) public {
+        scatterBidAddress = _scatterBid;
     }
 
     /**
@@ -22,7 +22,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
      */
 
     function addValidation(int bidId, address payable _validator, bool _isValid)
-    external skatterBidOnly returns (bool)
+    external scatterBidOnly returns (bool)
     {
         if (bids[bidId].bidder == address(0))
         {
@@ -42,7 +42,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
         return true;
     }
 
-    function setValidatorPaid(int bidId, uint idx) external skatterBidOnly returns (bool)
+    function setValidatorPaid(int bidId, uint idx) external scatterBidOnly returns (bool)
     {
         if (bids[bidId].validations[idx].when == 0)
         {
@@ -53,7 +53,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
         return true;
     }
 
-    function setHoster(int bidId, address payable _hoster) external skatterBidOnly returns (bool)
+    function setHoster(int bidId, address payable _hoster) external scatterBidOnly returns (bool)
     {
         if (bids[bidId].bidder == address(0))
         {
@@ -64,7 +64,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
         return true;
     }
 
-    function setHosterPaid(int bidId) external skatterBidOnly returns (bool)
+    function setHosterPaid(int bidId) external scatterBidOnly returns (bool)
     {
         if (bids[bidId].bidder == address(0) || bids[bidId].hoster == address(0))
         {
@@ -107,7 +107,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
 
     function addBid(address payable _sender, bytes32 fileHash, int64 fileSize, uint bidValue, 
                     uint validationPool, int16 minValidations, uint durationSeconds)
-    external skatterBidOnly returns (int)
+    external scatterBidOnly returns (int)
     {
         int bidId = bidCount;
 
@@ -255,10 +255,10 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
      * Admin interface
      */
 
-    function setSkatterBid(address _newAddress) public ownerOnly
+    function setScatterBid(address _newAddress) public ownerOnly
     {
         assert(_newAddress != address(0));
-        skatterBidAddress = _newAddress;
+        scatterBidAddress = _newAddress;
     }
 
     function setBidCount(int _bidCount) public ownerOnly

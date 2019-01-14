@@ -1,4 +1,4 @@
-""" Tests for SkatterBid
+""" Tests for ScatterBid
 
 Overview
 --------

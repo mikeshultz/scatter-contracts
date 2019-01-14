@@ -32,24 +32,24 @@ from .consts import (
 
 def test_store_admin_funcs(web3, contracts):
     """ Test a simple addBid """
-    admin, nobody, _, _, _, _, SkatterBid = get_accounts(web3)
+    admin, nobody, _, _, _, _, ScatterBid = get_accounts(web3)
     
     bidStore = contracts.get('BidStore')
 
-    # Set the SkatterBid address
-    txhash = bidStore.functions.setSkatterBid(nobody).transact(std_tx({
+    # Set the ScatterBid address
+    txhash = bidStore.functions.setScatterBid(nobody).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
 
-    assert bidStore.functions.skatterBidAddress().call() == nobody
-    txhash = bidStore.functions.setSkatterBid(SkatterBid).transact(std_tx({
+    assert bidStore.functions.scatterBidAddress().call() == nobody
+    txhash = bidStore.functions.setScatterBid(ScatterBid).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
-    assert bidStore.functions.skatterBidAddress().call() == SkatterBid
+    assert bidStore.functions.scatterBidAddress().call() == ScatterBid
 
     # Setting of bidCount
     assert bidStore.functions.bidCount().call() == 0
@@ -73,8 +73,8 @@ def test_add_bid(web3, contracts):
     
     bidStore = contracts.get('BidStore')
 
-    # Set the SkatterBid address
-    txhash = bidStore.functions.setSkatterBid(sbAddress).transact(std_tx({
+    # Set the ScatterBid address
+    txhash = bidStore.functions.setScatterBid(sbAddress).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
@@ -132,7 +132,7 @@ def test_add_validation(web3, contracts):
     AV_GAS = int(6e6)
 
     # Verify state is expected
-    assert bidStore.functions.skatterBidAddress().call() == sbAddress
+    assert bidStore.functions.scatterBidAddress().call() == sbAddress
     assert bidStore.functions.getValidationCount(0).call() == 0
     assert bidStore.functions.getBidder(0).call() == bidder
 
@@ -211,7 +211,7 @@ def test_pinning(web3, contracts):
     VALID_GAS = int(6e6)
 
     # Verify state is expected
-    assert bidStore.functions.skatterBidAddress().call() == sbAddress
+    assert bidStore.functions.scatterBidAddress().call() == sbAddress
 
     bidValue = int(1e17)
     validationPool = int(1e17)

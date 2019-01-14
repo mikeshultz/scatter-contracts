@@ -1,6 +1,6 @@
-# skatter-contracts
+# scatter-contracts
 
-Ethereum smart contracts for skatter.online.
+Ethereum smart contracts for scatter.online.
 
 ## Libraries
 
@@ -12,7 +12,7 @@ TBD
 
 TBD
 
-### SkatterRewards
+### ScatterRewards
 
 TBD
 
@@ -23,7 +23,7 @@ TBD
 
 ## Contracts
 
-### SkatterRouter
+### ScatterRouter
 
 TBD
 
@@ -35,7 +35,7 @@ TBD
 
 TBD
 
-### SkatterBid
+### ScatterBid
 
 TBD
 
@@ -54,7 +54,8 @@ TBD
 
 ### Install Solidbyte
 
-The Solidbyte framework is used for dev.  Best to install it in a Python virtual environment.
+The [Solidbyte framework](https://github.com/mikeshultz/solidbyte) is used for dev.  Best to install
+it in a Python virtual environment.
 
     export VENV_DIR="/path/to/venv"
     python3 -m venv $VENV_DIR

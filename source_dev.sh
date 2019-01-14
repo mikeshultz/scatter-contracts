@@ -12,7 +12,7 @@ fi
 ls $VENV_ROOT 2&>1 /dev/null
 
 if [ "$?" -gt 0 ]; then
-    mkdir -p $VENV_ROOT && python3 -m venv $VENV_ROOT/skatter
+    mkdir -p $VENV_ROOT && python3 -m venv $VENV_ROOT/scatter
 fi
 
-. $VENV_ROOT/skatter/bin/activate
+. $VENV_ROOT/scatter/bin/activate
