@@ -1,9 +1,11 @@
 
-def main(web3, contracts, deployer_account, network):
+def main(assertions, web3, contracts, deployer_account, network):
     assert contracts is not None
     assert deployer_account is not None
     assert web3 is not None
     assert network is not None
+
+    GAS_PRICE = int(3e9)
     
     deployer_balance = web3.eth.getBalance(deployer_account)
 
@@ -15,7 +17,7 @@ def main(web3, contracts, deployer_account, network):
                 'from': web3.eth.accounts[0], # The pre-funded account in ganace-cli
                 'to': deployer_account,
                 'value': fund_value,
-                'gasPrice': int(3e9),
+                'gasPrice': GAS_PRICE,
                 })
             receipt = web3.eth.waitForTransactionReceipt(tx)
             assert receipt.status == 1, "Funding deployer_account failed"
@@ -30,6 +32,15 @@ def main(web3, contracts, deployer_account, network):
     print("deployer_balance: {} Ether".format(deployer_balance / 1e18))
     #Test = contracts.get('Test')
     print("contracts: ", contracts)
+
+    ##
+    # Structures Library
+    ##
+    # Structures = contracts.get('Structures')
+    # assert Structures is not None, "Unable to get Structures contract"
+
+    # structures = Structures.deployed()
+    # assert rewards.address is not None, "Deploy of Structures failed.  No address found"
 
     ##
     # SafeMath Library
@@ -59,13 +70,33 @@ def main(web3, contracts, deployer_account, network):
         })
     assert rewards.address is not None, "Deploy of SkatterRewards failed.  No address found"
 
+    ##
+    # BidStore - Primary storage contract
+    ##
+    BidStore = contracts.get('BidStore')
+    assert BidStore is not None, "Unable to get BidStore contract"
+
+    store = BidStore.deployed(deployer_account, gas=int(6e6))
+    assert store.address is not None, "Deploy of BidStore failed.  No address found"
+
+    ##
+    # SkatterBid - Primary contract
+    ##
     SkatterBid = contracts.get('SkatterBid')
     assert SkatterBid is not None, "Unable to get SkatterBid contract"
 
-    sb = SkatterBid.deployed(env.address, links={
+    sb = SkatterBid.deployed(env.address, store.address, links={
         'SafeMath': safeMath.address,
         'SkatterRewards': rewards.address
         })
     assert sb.address is not None, "Deploy of SkatterBid failed.  No address found"
+
+    store_sb_address = store.functions.skatterBidAddress().call()
+    if store_sb_address != sb.address:
+        store.functions.setSkatterBid(sb.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+            })
 
     return True

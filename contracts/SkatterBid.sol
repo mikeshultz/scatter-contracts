@@ -1,61 +1,45 @@
 pragma solidity ^0.5.2;
 
-import './SafeMath.sol';
-import './Env.sol';
-import './SkatterRewards.sol';
+import './interface/ISkatterRouter.sol';
+import './interface/ISkatterBid.sol';
 
-contract SkatterBid {
+import './lib/Owned.sol';
+import './lib/SafeMath.sol';
+import './lib/Structures.sol';
+import './lib/SkatterRewards.sol';
+
+import './storage/Env.sol';
+import './storage/BidStore.sol';
+
+contract SkatterBid is Owned {  /// interface: ISkatterBid
     using SafeMath for uint;
-    
-    struct Validation {
-        int64 bidId;
-        uint when;
-        address payable validator;
-        bool isValid;
-        bool paid;
-    }
-
-    struct Bid {
-        address bidder;
-        bytes32 fileHash;
-        int64 fileSize;
-        uint bidAmount;
-        uint validationPool;
-        uint duration;
-        uint accepted;
-        bool paid;
-        address payable hoster;
-        uint pinned;
-        int16 minValidations;  // Also, kind of, minimum majority (e.g. win by X)
-        Validation[] validations;
-    }
 
     event BidSuccessful(
-        int64 indexed bidId,
+        int indexed bidId,
         address indexed bidder,
         uint indexed bidValue,
         uint validationPool,
         bytes32 fileHash,
-        int64 fileSize
+        int fileSize
     );
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
-    event Accepted(int64 indexed bidId, address indexed hoster);
+    event Accepted(int indexed bidId, address indexed hoster);
     event AcceptWait(uint waitLeft);
-    event Pinned(int64 indexed bidId, address indexed hoster, bytes32 fileHash);
-    event NotAcceptedByPinner(int64 indexed bidId, address indexed hoster);
-    event WithdrawFailed(int64 indexed bidId, address indexed sender, string reason);
-    event WithdrawDuplicate(int64 indexed bidId, address indexed sender);
-    event WithdrawHoster(int64 indexed bidId, address indexed hoster);
-    event WithdrawValidator(int64 indexed bidId, address indexed validator);
-    event ValidationOcurred(int64 indexed bidId, address indexed validator, bool indexed isValid);
+    event Pinned(int indexed bidId, address indexed hoster, bytes32 fileHash);
+    event NotAcceptedByPinner(int indexed bidId, address indexed hoster);
+    event WithdrawFailed(address indexed sender, string reason);
+    event Withdraw(uint indexed value, address indexed hoster);
+    event Paid(int indexed bidId, uint indexed value, address indexed validator);
+    event ValidationOcurred(int indexed bidId, address indexed validator, bool indexed isValid);
     event GeneralError(string why);
 
-    address public owner;
     Env public env;
+    IBidStore public bidStore;
 
-    int64 public bidCount;
-    mapping(int64 => Bid) bids;
+    int public bidCount;
+    mapping(int => Structures.Bid) bids;
+    mapping(address => uint) balanceSheet;
     uint public remainderFunds;
 
     bytes32 constant EMPTY_IPFS_FILE = 0xbfccda787baba32b59c78450ac3d20b633360b43992c77289f9ed46d843561e6;
@@ -64,68 +48,86 @@ contract SkatterBid {
     bytes32 constant ENV_MIN_DURATION = keccak256("minDuration");
     bytes32 constant ENV_MIN_BID = keccak256("minBid");
 
-    modifier ownerOnly() { require(msg.sender == owner, "denied"); _; }
     modifier notBanned() { require(!env.isBanned(msg.sender), "banned"); _; }
+    modifier notLocked() { require(!env.isBanned(msg.sender), "banned"); _; }
 
-    constructor(address _env) public
+    constructor(address _env, address _bidStore) public
     {
         owner = msg.sender;
         env = Env(_env);
+        bidStore = IBidStore(_bidStore);
     }
 
     /**
      * Utility
      */
 
-    function isBidOpenForPin(int64 bidId, address hoster) public view
+    function isBidOpenForPin(int bidId, address _hoster) public view
     returns (bool)
     {
         uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
+        bytes32 fileHash = bidStore.getFileHash(bidId);
+        uint accepted = bidStore.getAccepted(bidId);
+        address hoster = bidStore.getHoster(bidId);
+
+        /*(
+            address bidder,
+            bytes32 fileHash,
+            int fileSize,
+            uint bidAmount,
+            uint validationPool,
+            uint duration,
+            int16 minValid
+        ) = bidStore.getBid(bidId);*/
+
         return (
-            bids[bidId].fileHash != bytes32(0)
-            && bids[bidId].pinned == 0
+            fileHash != bytes32(0)
+            && !bidStore.isPinned(bidId)
             && (
-                bids[bidId].accepted == 0
-                || now - uint(bids[bidId].accepted) >= acceptWait
+                accepted == 0
+                || now - uint(accepted) >= acceptWait
                 || (
-                    now - uint(bids[bidId].accepted) < acceptWait
-                    && bids[bidId].hoster == hoster
+                    now - uint(accepted) < acceptWait
+                    && hoster == _hoster
                 )
             )
         );
     }
 
-    function isBidOpenForPin(int64 bidId) public view
+    function isBidOpenForPin(int bidId) public view
     returns (bool)
     {
         return isBidOpenForPin(bidId, msg.sender);
     }
 
-    function isBidOpenForAccept(int64 bidId, address hoster) public view
+    function isBidOpenForAccept(int bidId, address _hoster) public view
     returns (bool)
     {
         uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
+        bytes32 fileHash = bidStore.getFileHash(bidId);
+        uint accepted = bidStore.getAccepted(bidId);
+        address bidder = bidStore.getBidder(bidId);
         return (
-            bids[bidId].fileHash != bytes32(0)
-            && bids[bidId].pinned == 0
-            && (bids[bidId].accepted == 0 || now - uint(bids[bidId].accepted) >= acceptWait)
-            && bids[bidId].bidder != hoster
+            fileHash != bytes32(0)
+            && !bidStore.isPinned(bidId)
+            && (accepted == 0 || now - uint(accepted) >= acceptWait)
+            && bidder != _hoster
         );
     }
 
-    function isBidOpenForAccept(int64 bidId) public view
+    function isBidOpenForAccept(int bidId) public view
     returns (bool)
     {
         return isBidOpenForAccept(bidId, msg.sender);
     }
 
-    function validationSway(int64 bidId) public view returns (uint)
+    function validationSway(int bidId) public view returns (uint)
     {
-        uint total = bids[bidId].validations.length;
+        uint total = bidStore.getValidationCount(bidId);
         uint sway = 0;
         for (uint i=0; i<total; i++)
         {
-            if (bids[bidId].validations[i].isValid)
+            if (bidStore.getValidationIsValid(bidId, i))
             {
                 sway += 1;
             }
@@ -137,7 +139,7 @@ contract SkatterBid {
         return sway;
     }
 
-    function satisfied(int64 bidId) public view returns (bool)
+    function satisfied(int bidId) public view returns (bool)
     {
         uint total = bids[bidId].validations.length;
         if (total < uint(bids[bidId].minValidations))
@@ -156,12 +158,12 @@ contract SkatterBid {
         return(sway >= uint(bids[bidId].minValidations));
     }
 
-    function addValidation(int64 bidId, bool isValid)
+    function addValidation(int bidId, bool isValid)
     internal
     {
         require(bids[bidId].pinned > 0, "not open");
 
-        Validation memory validation = Validation(
+        Structures.Validation memory validation = Structures.Validation(
             bidId,
             now,
             msg.sender,
@@ -178,10 +180,10 @@ contract SkatterBid {
      * Readers
      */
 
-    function getBid(int64 bidId) public view returns (
+    function getBid(int bidId) public view returns (
         address,
         bytes32,
-        int64,
+        int,
         uint,
         uint,
         uint,
@@ -199,11 +201,11 @@ contract SkatterBid {
         );
     }
 
-    function getJob() public view returns (int64, bytes32, int64)
+    function getJob() public view returns (int, bytes32, int)
     {
         // TODO: Look into a queue library, maybe?
         // TODO: Test this with thousands(or more) bids
-        for (int64 i=0; i<bidCount; i++)
+        for (int i=0; i<bidCount; i++)
         {
             if (isBidOpenForAccept(i))
             {
@@ -213,30 +215,50 @@ contract SkatterBid {
         return (-1, 0, 0);
     }
 
-    function getValidation(int64 bidId, uint idx) public view
-    returns (int64, uint, address, bool, bool)
+    function getValidation(int bidId, uint idx) public view
+    returns (uint, address, bool, bool)
     {
-        Validation memory v = bids[bidId].validations[idx];
+        (
+             uint when,
+             address validator,
+             bool isValid,
+             bool paid
+        ) = bidStore.getValidation(bidId, idx);
         return (
-            v.bidId,
-            v.when,
-            v.validator,
-            v.isValid,
-            v.paid
+            when,
+            validator,
+            isValid,
+            paid
         );
     }
 
-    function getValidationCount(int64 bidId)
+    function getValidationCount(int bidId)
     public view returns (uint)
     {
-        return bids[bidId].validations.length;
+        return bidStore.getValidationCount(bidId);
+    }
+
+    function getHoster(int bidId)
+    public view returns (address)
+    {
+        return bidStore.getHoster(bidId);
+    }
+
+    function balance(address _address) public view returns (uint)
+    {
+        return balanceSheet[_address];
+    }
+
+    function balance() public view returns (uint)
+    {
+        return balanceSheet[msg.sender];
     }
 
     /**
      * Writers
      */
 
-    function setOwner(address newOwner)
+    function setOwner(address payable newOwner)
     public
     ownerOnly
     {
@@ -262,7 +284,7 @@ contract SkatterBid {
 
     function bid(
         bytes32 fileHash,
-        int64 fileSize,
+        int fileSize,
         uint durationSeconds,
         uint bidValue,
         uint validationPool,
@@ -274,6 +296,13 @@ contract SkatterBid {
     {
 
         bidCount++;
+
+        // Check value transfer
+        if (msg.value < bidValue.add(validationPool))
+        {
+            emit BidInvalid(fileHash, "no value");
+            return false;
+        }
 
         // Input Validation
         if (fileHash == bytes32(0) || fileSize < 1)
@@ -314,23 +343,25 @@ contract SkatterBid {
             return false;
         }
 
-        int64 bidId = bidCount;
+        int bidId = bidStore.addBid(msg.sender, fileHash, fileSize, bidValue,
+                                      validationPool, minValidations,
+                                      durationSeconds);
 
         // Store the bid
-        bids[bidId].bidder = msg.sender;
+        /*bids[bidId].bidder = msg.sender;
         bids[bidId].fileHash = fileHash;
         bids[bidId].fileSize = fileSize;
         bids[bidId].bidAmount = bidValue;
         bids[bidId].validationPool = validationPool;
         bids[bidId].minValidations = minValidations;
-        bids[bidId].duration = durationSeconds;
+        bids[bidId].duration = durationSeconds;*/
 
         emit BidSuccessful(bidId, msg.sender, bidValue, validationPool, fileHash, fileSize);
 
         return true;
     }
 
-    function accept(int64 bidId) public notBanned
+    function accept(int bidId) public notBanned
     returns (bool)
     {
 
@@ -341,15 +372,17 @@ contract SkatterBid {
         }
 
         // Set the accepted timer
-        bids[bidId].accepted = now;
-        bids[bidId].hoster = msg.sender;
+        /*bids[bidId].accepted = now;
+        bids[bidId].hoster = msg.sender;*/
+
+        require(bidStore.setAcceptNow(bidId, msg.sender), "accept error");
 
         emit Accepted(bidId, msg.sender);
 
         return true;
     }
 
-    function pinned(int64 bidId) public notBanned
+    function pinned(int bidId) public notBanned
     returns (bool)
     {
         require(bids[bidId].pinned == 0, "already pinned");
@@ -360,26 +393,41 @@ contract SkatterBid {
             return false;
         }
 
-        bids[bidId].pinned = now;
+        /*bids[bidId].pinned = now;
+        bids[bidId].hoster = msg.sender;*/
 
-        emit Pinned(bidId, msg.sender, bids[bidId].fileHash);
+        require(bidStore.setPinned(bidId, msg.sender), "accept error");
+
+        uint validationPool = bidStore.getValidationPool(bidId);
+
+        // Payout
+        uint amountPaid = SkatterRewards.payValidators(address(bidStore), bidId, balanceSheet);
+        uint remainder = validationPool - amountPaid;
+        if (remainder > 0)
+        {
+            remainderFunds += remainder;
+        }
+        SkatterRewards.payHoster(address(bidStore), bidId, balanceSheet);
+
+        bytes32 fileHash = bidStore.getFileHash(bidId);
+        emit Pinned(bidId, msg.sender, fileHash);
 
         return true;
     }
 
-    function validate(int64 bidId)
+    function validate(int bidId)
     public notBanned
     {
         addValidation(bidId, true);
     }
 
-    function invalidate(int64 bidId)
+    function invalidate(int bidId)
     public notBanned
     {
         addValidation(bidId, false);
     }
 
-    function validatorIndex(int64 bidId, address validator) public view returns (uint)
+    function validatorIndex(int bidId, address validator) public view returns (uint)
     {
 
         if (bids[bidId].validations.length < 1)
@@ -399,7 +447,31 @@ contract SkatterBid {
 
     }
 
-    function withdraw(int64 bidId) public notBanned
+    function transfer(address payable _dest) public notBanned
+    {
+        uint senderBalance = balanceSheet[msg.sender];
+
+        // Verify
+        if (senderBalance == 0)
+        {
+            emit WithdrawFailed(msg.sender, "zero balance");
+            return;
+        }
+        require(senderBalance < address(this).balance, "not enough funds");
+
+        // Reset and transfer
+        balanceSheet[msg.sender] = 0;
+        _dest.transfer(senderBalance);
+
+        emit Withdraw(senderBalance, msg.sender);
+    }
+
+    function withdraw() public notBanned
+    {
+        transfer(msg.sender);
+    }
+
+    /*function withdraw(int64 bidId) public notBanned
     {
         uint validatorIdx = validatorIndex(bidId, msg.sender);
 
@@ -440,24 +512,25 @@ contract SkatterBid {
                 remainderFunds += remainder;
             }
 
-            emit WithdrawValidator(bidId, msg.sender);
+            emit WithdrawValidator(bidId, split, msg.sender);
         }
         // Or a hoster
         else if (bids[bidId].hoster == msg.sender)
         {
-            assert(bids[bidId].bidAmount > 0);
-            assert(address(this).balance > 0);
+            //assert(bids[bidId].bidAmount > 0);
+            //assert(address(this).balance > 0);
+            require(address(this).balance > 0, "no money");
 
             if (bids[bidId].paid)
             {
-                emit GeneralError("already paid");
+                emit WithdrawFailed(bidId, msg.sender, "already paid");
                 return;
             }
 
             bids[bidId].paid = true;
             bids[bidId].hoster.transfer(bids[bidId].bidAmount);
 
-            emit WithdrawHoster(bidId, msg.sender);
+            emit WithdrawHoster(bidId, bids[bidId].bidAmount, msg.sender);
         }
         // This user shouldn't be submitting
         else
@@ -465,6 +538,6 @@ contract SkatterBid {
             emit WithdrawFailed(bidId, msg.sender, "invalid widthrawer");
         }
 
-    }
+    }*/
 
 }
