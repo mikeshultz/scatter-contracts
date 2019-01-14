@@ -1,17 +1,17 @@
 pragma solidity ^0.5.2;
 
-import './interface/IScatterRouter.sol';
-import './interface/IScatterBid.sol';
+import "./interface/IScatterRouter.sol";
+import "./interface/IScatterBid.sol";
 
-import './lib/Owned.sol';
-import './lib/SafeMath.sol';
-import './lib/Structures.sol';
-import './lib/ScatterRewards.sol';
+import "./lib/Owned.sol";
+import "./lib/SafeMath.sol";
+import "./lib/Structures.sol";
+import "./lib/ScatterRewards.sol";
 
-import './storage/Env.sol';
-import './storage/BidStore.sol';
+import "./storage/Env.sol";
+import "./storage/BidStore.sol";
 
-contract ScatterBid is Owned {  /// interface: IScatterBid
+contract Scatter is Owned {  /// interface: IScatterBid
     using SafeMath for uint;
 
     event BidSuccessful(
