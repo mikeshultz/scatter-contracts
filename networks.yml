@@ -2,6 +2,7 @@
 ---
 dev:
   type: auto
+  autodeploy_allowed: true
 
 infura-mainnet:
   type: websocket
@@ -13,3 +14,4 @@ geth:
 
 test:
   type: eth_tester
+  autodeploy_allowed: true
