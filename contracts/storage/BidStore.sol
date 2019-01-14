@@ -255,7 +255,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
      * Admin interface
      */
 
-    function setScatterBid(address _newAddress) public ownerOnly
+    function setScatter(address _newAddress) public ownerOnly
     {
         assert(_newAddress != address(0));
         scatterBidAddress = _newAddress;

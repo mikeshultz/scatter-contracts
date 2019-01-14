@@ -46,7 +46,7 @@ def main(assertions, web3, contracts, deployer_account, network):
     # SafeMath Library
     ##
     SafeMath = contracts.get('SafeMath')
-    assert SafeMath is not None, "Unable to get ScatterRewards contract"
+    assert SafeMath is not None, "Unable to get SafeMath contract"
 
     safeMath = SafeMath.deployed()
     assert safeMath.address is not None, "SafeMath was not deployed or is unknown"
@@ -60,15 +60,15 @@ def main(assertions, web3, contracts, deployer_account, network):
     assert env.address is not None, "Deploy of Env failed.  No address found"
 
     ##
-    # ScatterRewards Library
+    # Rewards Library
     ##
-    ScatterRewards = contracts.get('ScatterRewards')
-    assert ScatterRewards is not None, "Unable to get ScatterRewards contract"
+    Rewards = contracts.get('Rewards')
+    assert Rewards is not None, "Unable to get Rewards contract"
 
-    rewards = ScatterRewards.deployed(links={
+    rewards = Rewards.deployed(links={
             'SafeMath': safeMath.address,
         })
-    assert rewards.address is not None, "Deploy of ScatterRewards failed.  No address found"
+    assert rewards.address is not None, "Deploy of Rewards failed.  No address found"
 
     ##
     # BidStore - Primary storage contract
@@ -80,20 +80,20 @@ def main(assertions, web3, contracts, deployer_account, network):
     assert store.address is not None, "Deploy of BidStore failed.  No address found"
 
     ##
-    # ScatterBid - Primary contract
+    # Scatter - Primary contract
     ##
-    ScatterBid = contracts.get('ScatterBid')
-    assert ScatterBid is not None, "Unable to get ScatterBid contract"
+    Scatter = contracts.get('Scatter')
+    assert Scatter is not None, "Unable to get Scatter contract"
 
-    sb = ScatterBid.deployed(env.address, store.address, links={
+    sb = Scatter.deployed(env.address, store.address, links={
         'SafeMath': safeMath.address,
-        'ScatterRewards': rewards.address
+        'Rewards': rewards.address
         })
-    assert sb.address is not None, "Deploy of ScatterBid failed.  No address found"
+    assert sb.address is not None, "Deploy of Scatter failed.  No address found"
 
     store_sb_address = store.functions.scatterBidAddress().call()
     if store_sb_address != sb.address:
-        store.functions.setScatterBid(sb.address).transact({
+        store.functions.setScatter(sb.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
