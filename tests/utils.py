@@ -1,15 +1,26 @@
+import sys
 from attrdict import AttrDict
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import get_event_data
-from .consts import DEPLOYER_ACCOUNT
+from .consts import DEPLOYER_ACCOUNT, STD_GAS, STD_GAS_PRICE
+
+
+def std_tx(tx):
+    """ Build a standard tx object """
+    std = {
+        'gas': STD_GAS,
+        'gasPrice': STD_GAS_PRICE,
+    }
+    std.update(tx)
+    return std
 
 
 def get_accounts(web3):
     """
     Return 6 accounts
 
-    admin, bidder, hoster, validator1, validator2, validator3 = get_accounts()
+    admin, bidder, hoster, validator1, validator2, validator3, validator4 = get_accounts()
     """
     return (
         DEPLOYER_ACCOUNT,
@@ -18,21 +29,15 @@ def get_accounts(web3):
         web3.eth.accounts[2],
         web3.eth.accounts[3],
         web3.eth.accounts[4],
+        web3.eth.accounts[5],
     )
 
 
-def get_std_tx(from_addr):
-    tx = {
-        'from': from_addr,
-    }
-    return tx
-
-
 def topic_signature(abi):
-    if abi.type != 'event':
+    if abi.get('type') != 'event':
         return None
-    args = ','.join([a.type for a in abi.inputs])
-    sig = '{}({})'.format(abi.name, args)
+    args = ','.join([a.get('type') for a in abi.get('inputs')])
+    sig = '{}({})'.format(abi.get('name'), args)
     print("topic_signature: {}".format(sig))
     return Web3.sha3(text=sig)
 
@@ -52,7 +57,7 @@ def event_topics(web3contract):
 def event_abi(contract_abi, name):
     """ Return the abi for a specific event """
     for abi in contract_abi:
-        if abi.type == 'event' and abi.name == name:
+        if abi.get('type') == 'event' and abi.get('name') == name:
             return abi
     return None
 
@@ -62,26 +67,22 @@ def get_event(web3contract, event_name, rcpt):
     if len(rcpt.logs) < 1:
         return None
 
+    abi = event_abi(web3contract.abi, event_name)
+
     for log in rcpt.logs:
-        abi = event_abi(web3contract.abi, event_name)
-        if not abi:
-            continue
         evnt_data = get_event_data(abi, log)
-        print('get_event evnt_data', evnt_data)
+        print('get_event evnt_data', evnt_data, file=sys.stderr)
         return evnt_data
     return None
 
 
 def has_event(web3contract, event_name, rcpt):
-    print("rcpt", rcpt)
     abi = event_abi(web3contract.abi, event_name)
     sig = HexBytes(topic_signature(abi).hex())
-    print("{} signature: {}".format(event_name, sig))
     for log in rcpt.logs:
-        print("topics: {}".format(log.topics))
         if len(log.topics) > 0 and log.topics[0] == sig:
             return True
     return False
 
-def normalize_event_filehash(fH):
+def normalize_filehash(fH):
     return '0x' + fH.hex()
