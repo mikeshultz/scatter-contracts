@@ -72,6 +72,7 @@ def test_add_bid(web3, contracts):
     admin, bidder, sAddress, _, _, _, _ = get_accounts(web3)
     
     bidStore = contracts.get('BidStore')
+    scatter = contracts.get('Scatter')
 
     # Set the Scatter address
     txhash = bidStore.functions.setScatter(sAddress).transact(std_tx({
@@ -267,3 +268,10 @@ def test_pinning(web3, contracts):
     assert bidStore.functions.getAccepted(bidId).call() > int(datetime.now().timestamp()) - 60 * 5
     assert bidStore.functions.getPinned(bidId).call() > int(datetime.now().timestamp()) - 60 * 5
     assert bidStore.functions.getHoster(bidId).call() == otherHoster
+
+    # Set Scatter back so other tests don't fail
+    txhash = bidStore.functions.setScatter(scatter.address).transact(std_tx({
+            'from': admin
+        }))
+    receipt = web3.eth.waitForTransactionReceipt(txhash)
+    assert receipt.status == 1
