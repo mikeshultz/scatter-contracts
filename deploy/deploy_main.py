@@ -34,6 +34,15 @@ def main(assertions, web3, contracts, deployer_account, network):
     print("contracts: ", contracts)
 
     ##
+    # Router
+    ##
+    Router = contracts.get('Router')
+    assert Router is not None
+
+    router = Router.deployed()
+    assert router.address is not None, "No address on Router contract object"
+
+    ##
     # Structures Library
     ##
     # Structures = contracts.get('Structures')
@@ -91,7 +100,7 @@ def main(assertions, web3, contracts, deployer_account, network):
         })
     assert sb.address is not None, "Deploy of Scatter failed.  No address found"
 
-    store_sb_address = store.functions.scatterBidAddress().call()
+    store_sb_address = store.functions.scatterAddress().call()
     if store_sb_address != sb.address:
         store.functions.setScatter(sb.address).transact({
             'from': deployer_account,
