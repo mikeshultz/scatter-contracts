@@ -3,6 +3,7 @@
     "rules": {
         "compiler-fixed": false,
         "separate-by-one-line-in-contract": "warn",
+        "statement-indent": "warn",
         "bracket-align": false,
         "indent": ["error", 4],                
         "quotes": ["error", "double"],         
