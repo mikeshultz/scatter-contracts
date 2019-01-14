@@ -1,7 +1,7 @@
 pragma solidity ^0.5.2;
 
 import "./interface/IScatterRouter.sol";
-import "./interface/IScatterBid.sol";
+import "./interface/IScatter.sol";
 
 import "./lib/Owned.sol";
 import "./lib/SafeMath.sol";
@@ -11,7 +11,7 @@ import "./lib/ScatterRewards.sol";
 import "./storage/Env.sol";
 import "./storage/BidStore.sol";
 
-contract Scatter is Owned {  /// interface: IScatterBid
+contract Scatter is Owned {  /// interface: IScatter
     using SafeMath for uint;
 
     event BidSuccessful(
