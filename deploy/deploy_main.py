@@ -102,10 +102,12 @@ def main(assertions, web3, contracts, deployer_account, network):
 
     store_sb_address = store.functions.scatterAddress().call()
     if store_sb_address != sb.address:
-        store.functions.setScatter(sb.address).transact({
+        set_hash = store.functions.setScatter(sb.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
             })
+        set_receipt = web3.eth.waitForTransactionReceipt(set_hash)
+        assert set_receipt.status == 1
 
     return True

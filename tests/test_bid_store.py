@@ -17,7 +17,8 @@ from .utils import (
 )
 from .consts import (
     ZERO_ADDRESS,
-    BID_CONTRACT_NAME,
+    MAIN_CONTRACT_NAME,
+    STORE_CONTRACT_NAME,
     ENV_CONTRACT_NAME,
     FILE_HASH_1,
     FILE_SIZE_1,
@@ -34,7 +35,7 @@ def test_store_admin_funcs(web3, contracts):
     """ Test a simple addBid """
     admin, nobody, _, _, _, _, Scatter = get_accounts(web3)
     
-    bidStore = contracts.get('BidStore')
+    bidStore = contracts.get(STORE_CONTRACT_NAME)
 
     # Set the Scatter address
     txhash = bidStore.functions.setScatter(nobody).transact(std_tx({
@@ -71,8 +72,8 @@ def test_add_bid(web3, contracts):
     """ Test a simple addBid """
     admin, bidder, sAddress, _, _, _, _ = get_accounts(web3)
     
-    bidStore = contracts.get('BidStore')
-    scatter = contracts.get('Scatter')
+    bidStore = contracts.get(STORE_CONTRACT_NAME)
+    scatter = contracts.get(MAIN_CONTRACT_NAME)
 
     # Set the Scatter address
     txhash = bidStore.functions.setScatter(sAddress).transact(std_tx({
@@ -127,7 +128,7 @@ def test_add_validation(web3, contracts):
     """ Test a simple addBid """
     admin, bidder, sAddress, validator1, validator2, validator3, _ = get_accounts(web3)
     
-    bidStore = contracts.get('BidStore')
+    bidStore = contracts.get(STORE_CONTRACT_NAME)
 
     BID_ID = 0
     AV_GAS = int(6e6)
@@ -206,7 +207,8 @@ def test_pinning(web3, contracts):
     """ test the pinning functionality """
     admin, bidder, sAddress, _, _, otherHoster, hoster = get_accounts(web3)
     
-    bidStore = contracts.get('BidStore')
+    bidStore = contracts.get(STORE_CONTRACT_NAME)
+    scatter = contracts.get(MAIN_CONTRACT_NAME)
 
     BID_GAS = int(1e6)
     VALID_GAS = int(6e6)

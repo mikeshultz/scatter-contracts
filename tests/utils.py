@@ -1,4 +1,6 @@
 import sys
+import math
+from datetime import datetime
 from attrdict import AttrDict
 from hexbytes import HexBytes
 from web3 import Web3
@@ -84,5 +86,42 @@ def has_event(web3contract, event_name, rcpt):
             return True
     return False
 
+
 def normalize_filehash(fH):
     return '0x' + fH.hex()
+
+
+def time_travel(web3, secs):
+    """ Time travel the chain """
+    block_before = web3.eth.getBlock('latest')
+    now = int(datetime.now().timestamp())
+
+    # eth_tester
+    try:
+        web3.testing.timeTravel(now + secs)
+        web3.testing.mine(1)  # Get one block in, at least
+    except ValueError as err:
+        if 'not supported' in str(err):
+            # Ganache/testrpc
+            assert len(web3.providers) > 0, "No web3 providers found"
+            web3.providers[0].make_request('evm_increaseTime', [secs])
+
+            # for evm_mine, ganache takes a timestmap for some reason, and it isn't reflected in the
+            # logs, either, so there's that.
+            web3.testing.mine(int(block_before.timestamp) + secs)
+        else:
+            raise err
+
+    # Verify
+    block_after = web3.eth.getBlock('latest')
+    assert block_before.number < block_after.number, "Time travel failed"
+    stamp_diff = int(block_after.timestamp) - int(block_before.timestamp)
+    assert stamp_diff >= secs, "Not enough time passed.  Only {} seconds.".format(stamp_diff)
+
+
+def block_travel(web3: Web3, blocks: int):
+    """ Travel forward X blocks """
+    block_before = web3.eth.getBlock('latest')
+    web3.testing.mine(math.ceil(blocks))
+    block_after = web3.eth.getBlock('latest')
+    assert block_after.number - block_before.number == blocks , "Block travel failed"
