@@ -2,177 +2,11 @@
   "contracts": [
     {
       "name": "Env",
-      "networks": {
-        "1547454791107": {
-          "deployedHash": "0x2107cb0e07574920a59736ca7db619f1be9f1ae7c35093e8fd8b4583a6b29307",
-          "deployedInstances": [
-            {
-              "hash": "0x2107cb0e07574920a59736ca7db619f1be9f1ae7c35093e8fd8b4583a6b29307",
-              "date": "2019-01-14T01:33:18.289441",
-              "address": "0x2Df085C0530c0FD5e8A4B7437b2Ed4103A88402F",
-              "abi": [
-                {
-                  "constant": true,
-                  "inputs": [
-                    {
-                      "name": "keyHash",
-                      "type": "bytes32"
-                    }
-                  ],
-                  "name": "getstr",
-                  "outputs": [
-                    {
-                      "name": "",
-                      "type": "string"
-                    }
-                  ],
-                  "payable": false,
-                  "stateMutability": "view",
-                  "type": "function"
-                },
-                {
-                  "constant": false,
-                  "inputs": [
-                    {
-                      "name": "keyHash",
-                      "type": "bytes32"
-                    },
-                    {
-                      "name": "value",
-                      "type": "uint256"
-                    }
-                  ],
-                  "name": "setuint",
-                  "outputs": [],
-                  "payable": false,
-                  "stateMutability": "nonpayable",
-                  "type": "function"
-                },
-                {
-                  "constant": true,
-                  "inputs": [],
-                  "name": "owner",
-                  "outputs": [
-                    {
-                      "name": "",
-                      "type": "address"
-                    }
-                  ],
-                  "payable": false,
-                  "stateMutability": "view",
-                  "type": "function"
-                },
-                {
-                  "constant": false,
-                  "inputs": [
-                    {
-                      "name": "_addr",
-                      "type": "address"
-                    }
-                  ],
-                  "name": "ban",
-                  "outputs": [],
-                  "payable": false,
-                  "stateMutability": "nonpayable",
-                  "type": "function"
-                },
-                {
-                  "constant": true,
-                  "inputs": [
-                    {
-                      "name": "_addr",
-                      "type": "address"
-                    }
-                  ],
-                  "name": "isBanned",
-                  "outputs": [
-                    {
-                      "name": "",
-                      "type": "bool"
-                    }
-                  ],
-                  "payable": false,
-                  "stateMutability": "view",
-                  "type": "function"
-                },
-                {
-                  "constant": false,
-                  "inputs": [
-                    {
-                      "name": "keyHash",
-                      "type": "bytes32"
-                    },
-                    {
-                      "name": "value",
-                      "type": "string"
-                    }
-                  ],
-                  "name": "setstr",
-                  "outputs": [],
-                  "payable": false,
-                  "stateMutability": "nonpayable",
-                  "type": "function"
-                },
-                {
-                  "constant": false,
-                  "inputs": [
-                    {
-                      "name": "_addr",
-                      "type": "address"
-                    }
-                  ],
-                  "name": "unban",
-                  "outputs": [],
-                  "payable": false,
-                  "stateMutability": "nonpayable",
-                  "type": "function"
-                },
-                {
-                  "constant": true,
-                  "inputs": [
-                    {
-                      "name": "keyHash",
-                      "type": "bytes32"
-                    }
-                  ],
-                  "name": "getuint",
-                  "outputs": [
-                    {
-                      "name": "",
-                      "type": "uint256"
-                    }
-                  ],
-                  "payable": false,
-                  "stateMutability": "view",
-                  "type": "function"
-                },
-                {
-                  "inputs": [],
-                  "payable": false,
-                  "stateMutability": "nonpayable",
-                  "type": "constructor"
-                }
-              ]
-            }
-          ]
-        }
-      }
+      "networks": {}
     },
     {
       "name": "SafeMath",
-      "networks": {
-        "1547454791107": {
-          "deployedHash": "0xf25a5dccc5eb5bf6e3c4b7416398af709db140e895fcca660a86f07b5249923a",
-          "deployedInstances": [
-            {
-              "hash": "0xf25a5dccc5eb5bf6e3c4b7416398af709db140e895fcca660a86f07b5249923a",
-              "date": "2019-01-14T01:33:17.624443",
-              "address": "0xb4D6b3D39d8b447DF9c78Dd18D01d8A6473F8d96",
-              "abi": []
-            }
-          ]
-        }
-      }
+      "networks": {}
     },
     {
       "name": "ScatterRewards",
@@ -184,6 +18,18 @@
     },
     {
       "name": "BidStore",
+      "networks": {}
+    },
+    {
+      "name": "Rewards",
+      "networks": {}
+    },
+    {
+      "name": "Scatter",
+      "networks": {}
+    },
+    {
+      "name": "Router",
       "networks": {}
     }
   ],
