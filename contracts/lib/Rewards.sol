@@ -20,6 +20,15 @@ library Rewards {
         );
     }
 
+    function durationHasPassed(uint _date, uint duration) public view returns (bool)
+    {
+        uint diff = now - _date;
+        if (diff < duration) {
+            return false;
+        }
+        return true;
+    }
+
     function payValidators(address _store, int bidId, mapping(address => uint) storage sheet)
     internal returns (uint)
     {
@@ -28,12 +37,9 @@ library Rewards {
         uint validatorCount = store.getValidationCount(bidId);
 
         uint totalPaid = 0;
-        uint split;
-        uint remainder;
-        (split, remainder) = getSplitAndRemainder(
-            validationPool,
-            validatorCount
-        );
+        //assert(validatorCount > 0);
+        require(validatorCount > 0, "no validations");
+        uint split = validationPool.div(validatorCount);
 
         for (uint i = 0; i < validatorCount; i++)
         {

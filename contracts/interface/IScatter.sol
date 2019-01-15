@@ -29,7 +29,9 @@ interface IScatter {
         int indexed bidId,
         address indexed bidder,
         uint indexed bidValue,
-        bytes32 fileHash
+        uint validationPool,
+        bytes32 fileHash,
+        int64 fileSize
     );
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
@@ -54,9 +56,10 @@ interface IScatter {
     function bid(
         bytes32 fileHash,
         int fileSize,
-        int duration,
+        int durationSeconds,
         uint bidValue,
-        uint validationPool
+        uint validationPool,
+        int minValidations
     )
     external
     payable
@@ -65,10 +68,9 @@ interface IScatter {
     function bid(
         bytes32 fileHash,
         int fileSize,
-        int durationSeconds,
+        int duration,
         uint bidValue,
-        uint validationPool,
-        int minValidations
+        uint validationPool
     )
     external
     payable

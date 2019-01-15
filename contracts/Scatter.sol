@@ -1,4 +1,4 @@
-pragma solidity ^0.5.2;
+pragma solidity >=0.5.2 <0.6.0;
 
 import "./interface/IRouter.sol";
 import "./interface/IScatter.sol";
@@ -12,6 +12,16 @@ import "./storage/Env.sol";
 import "./storage/BidStore.sol";
 
 
+/* Scatter
+
+General steps of use
+--------------------
+- user bids for hosting (bid())
+- hoster accepts, pins the file on their node, then.. (accept())
+- hoster marks it as 'pinned' (pinned())
+- validators verify that it is indeed pinned on the node (validate()/invalidate())
+- the first validator after duration triggers payouts for everyone
+*/
 contract Scatter is Owned {  /// interface: IScatter
     using SafeMath for uint;
 
@@ -21,7 +31,7 @@ contract Scatter is Owned {  /// interface: IScatter
         uint indexed bidValue,
         uint validationPool,
         bytes32 fileHash,
-        int fileSize
+        int64 fileSize
     );
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
@@ -38,8 +48,6 @@ contract Scatter is Owned {  /// interface: IScatter
     Env public env;
     IBidStore public bidStore;
 
-    int public bidCount;
-    mapping(int => Structures.Bid) private bids;
     mapping(address => uint) private balanceSheet;
     uint public remainderFunds;
 
@@ -51,7 +59,6 @@ contract Scatter is Owned {  /// interface: IScatter
     bytes32 private constant ENV_MIN_BID = keccak256("minBid");
 
     modifier notBanned() { require(!env.isBanned(msg.sender), "banned"); _; }
-    modifier notLocked() { require(!env.isBanned(msg.sender), "banned"); _; }
 
     constructor(address _env, address _bidStore) public
     {
@@ -133,8 +140,9 @@ contract Scatter is Owned {  /// interface: IScatter
 
     function satisfied(int bidId) public view returns (bool)
     {
-        uint total = bids[bidId].validations.length;
-        if (total < uint(bids[bidId].minValidations))
+        uint total = bidStore.getValidationCount(bidId);
+        uint minValid = uint(bidStore.getMinValidations(bidId));
+        if (total < minValid)
         {
             return false;
         }
@@ -147,23 +155,21 @@ contract Scatter is Owned {  /// interface: IScatter
         }
         
         // Must be a simple majority of minValidations or better
-        return(sway >= uint(bids[bidId].minValidations));
+        return(sway >= minValid);
     }
 
     function addValidation(int bidId, bool isValid)
     internal
     {
-        require(bids[bidId].pinned > 0, "not open");
+        require(bidStore.isPinned(bidId), "not open");
+        require(bidStore.addValidation(bidId, msg.sender, isValid), "add failed");
 
-        Structures.Validation memory validation = Structures.Validation(
-            bidId,
-            now,
-            msg.sender,
-            isValid,
-            false
-        );
-
-        bids[bidId].validations.push(validation);
+        uint whenPinned = bidStore.getPinned(bidId);
+        uint durationSeconds = bidStore.getDuration(bidId);
+        if (Rewards.durationHasPassed(whenPinned, durationSeconds))
+        {
+            payout(bidId);
+        }
 
         emit ValidationOcurred(bidId, msg.sender, isValid);
     }
@@ -182,26 +188,21 @@ contract Scatter is Owned {  /// interface: IScatter
         int16
     )
     {
-        return(
-            bids[bidId].bidder,
-            bids[bidId].fileHash,
-            bids[bidId].fileSize,
-            bids[bidId].bidAmount,
-            bids[bidId].validationPool,
-            bids[bidId].duration,
-            bids[bidId].minValidations
-        );
+        return bidStore.getBid(bidId);
     }
 
-    function getJob() public view returns (int, bytes32, int)
+    function getJob() public view returns (int, bytes32, int64)
     {
         // TODO: Look into a queue library, maybe?
         // TODO: Test this with thousands(or more) bids
-        for (int i=0; i<bidCount; i++)
+        int totalBids = bidStore.getBidCount();
+        for (int i = 0; i < totalBids; i++)
         {
             if (isBidOpenForAccept(i))
             {
-                return (i, bids[i].fileHash, bids[i].fileSize);
+                bytes32 fileHash = bidStore.getFileHash(i);
+                int64 fileSize = bidStore.getFileSize(i);
+                return (i, fileHash, fileSize);
             }
         }
         return (-1, 0, 0);
@@ -210,18 +211,7 @@ contract Scatter is Owned {  /// interface: IScatter
     function getValidation(int bidId, uint idx) public view
     returns (uint, address, bool, bool)
     {
-        (
-             uint when,
-             address validator,
-             bool isValid,
-             bool paid
-        ) = bidStore.getValidation(bidId, idx);
-        return (
-            when,
-            validator,
-            isValid,
-            paid
-        );
+        return bidStore.getValidation(bidId, idx);
     }
 
     function getValidationCount(int bidId)
@@ -263,22 +253,6 @@ contract Scatter is Owned {  /// interface: IScatter
         int64 fileSize,
         uint durationSeconds,
         uint bidValue,
-        uint validationPool
-    )
-    public notBanned
-    payable
-    returns (bool)
-    {
-        // Use the minimum validations default from the Env contract
-        uint minValid = env.getuint(ENV_DEFAULT_MIN_VALIDATIONS);
-        return bid(fileHash, fileSize, durationSeconds, bidValue, validationPool,int16(minValid));
-    }
-
-    function bid(
-        bytes32 fileHash,
-        int fileSize,
-        uint durationSeconds,
-        uint bidValue,
         uint validationPool,
         int16 minValidations
     )
@@ -287,13 +261,10 @@ contract Scatter is Owned {  /// interface: IScatter
     returns (bool)
     {
 
-        bidCount++;
-
         // Check value transfer
         if (msg.value < bidValue.add(validationPool))
         {
-            emit BidInvalid(fileHash, "no value");
-            return false;
+            revert("invalid value");
         }
 
         // Input Validation
@@ -334,14 +305,37 @@ contract Scatter is Owned {  /// interface: IScatter
             emit BidInvalid(fileHash, "zero pool");
             return false;
         }
+        int bidId = bidStore.addBid(msg.sender, fileHash, fileSize, bidValue, validationPool,
+                                    minValidations, durationSeconds);
 
-        int bidId = bidStore.addBid(msg.sender, fileHash, fileSize, bidValue,
-                                      validationPool, minValidations,
-                                      durationSeconds);
+        assert(bidId > -1);
 
-        emit BidSuccessful(bidId, msg.sender, bidValue, validationPool, fileHash, fileSize);
+        emit BidSuccessful(
+            bidId,
+            address(msg.sender),
+            bidValue,
+            validationPool,
+            fileHash,
+            fileSize
+        );
 
         return true;
+    }
+
+    function bid(
+        bytes32 fileHash,
+        int64 fileSize,
+        uint durationSeconds,
+        uint bidValue,
+        uint validationPool
+    )
+    public
+    payable
+    returns (bool)
+    {
+        // Use the minimum validations default from the Env contract
+        uint minValid = env.getuint(ENV_DEFAULT_MIN_VALIDATIONS);
+        return bid(fileHash, fileSize, durationSeconds, bidValue, validationPool, int16(minValid));
     }
 
     function accept(int bidId) public notBanned
@@ -350,7 +344,8 @@ contract Scatter is Owned {  /// interface: IScatter
 
         if (!isBidOpenForAccept(bidId))
         {
-            emit AcceptWait(now - bids[bidId].accepted);
+            uint accepted = bidStore.getAccepted(bidId);
+            emit AcceptWait(now - accepted);
             return false;
         }
 
@@ -364,31 +359,38 @@ contract Scatter is Owned {  /// interface: IScatter
     function pinned(int bidId) public notBanned
     returns (bool)
     {
-        require(bids[bidId].pinned == 0, "already pinned");
+        require(!bidStore.isPinned(bidId), "already pinned");
 
         if (!isBidOpenForPin(bidId))
         {
-            emit NotAcceptedByPinner(bidId, bids[bidId].hoster);
+            address storedHoster = bidStore.getHoster(bidId);
+            emit NotAcceptedByPinner(bidId, storedHoster);
             return false;
         }
 
         require(bidStore.setPinned(bidId, msg.sender), "accept error");
 
+        bytes32 fileHash = bidStore.getFileHash(bidId);
+        emit Pinned(bidId, msg.sender, fileHash);
+
+        return true;
+    }
+
+    function payout(int bidId)
+    internal
+    {   
         uint validationPool = bidStore.getValidationPool(bidId);
 
         // Payout
+        require(bidStore.getValidationCount(bidId) > 0, "non validators");
         uint amountPaid = Rewards.payValidators(address(bidStore), bidId, balanceSheet);
+
         uint remainder = validationPool - amountPaid;
         if (remainder > 0)
         {
             remainderFunds += remainder;
         }
         Rewards.payHoster(address(bidStore), bidId, balanceSheet);
-
-        bytes32 fileHash = bidStore.getFileHash(bidId);
-        emit Pinned(bidId, msg.sender, fileHash);
-
-        return true;
     }
 
     function validate(int bidId)
@@ -403,23 +405,10 @@ contract Scatter is Owned {  /// interface: IScatter
         addValidation(bidId, false);
     }
 
-    function validatorIndex(int bidId, address validator) public view returns (uint)
+    function validatorIndex(int bidId, address payable validator) public view returns (uint)
     {
 
-        if (bids[bidId].validations.length < 1)
-        {
-            return uint(-1);
-        }
-
-        for (uint i=0; i<bids[bidId].validations.length; i++)
-        {
-            if (validator == bids[bidId].validations[i].validator)
-            {
-                return i;
-            }
-        }
-
-        return uint(-1);
+        return bidStore.getValidatorIndex(bidId, validator);
 
     }
 
