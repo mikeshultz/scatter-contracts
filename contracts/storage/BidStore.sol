@@ -9,9 +9,13 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
 
     int public bidCount;
     mapping(int => Structures.Bid) private bids;
+    mapping(int => Structures.Validation[]) private validations;
     address public scatterAddress;
 
-    modifier scatterOnly() { require(msg.sender == scatterAddress, "not allowed"); _; }
+    modifier scatterOnly() {
+        require(msg.sender == scatterAddress, "not allowed");
+        _;
+    }
 
     constructor(address _scatter) public {
         scatterAddress = _scatter;
@@ -37,19 +41,19 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
             false       // paid
         );
 
-        bids[bidId].validations.push(vlad);
+        validations[bidId].push(vlad);
 
         return true;
     }
 
     function setValidatorPaid(int bidId, uint idx) external scatterOnly returns (bool)
     {
-        if (bids[bidId].validations[idx].when == 0)
+        if (validations[bidId][idx].when == 0)
         {
             return false;
         }
 
-        bids[bidId].validations[idx].paid = true;
+        validations[bidId][idx].paid = true;
         return true;
     }
 
@@ -109,6 +113,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
                     uint validationPool, int16 minValidations, uint durationSeconds)
     external scatterOnly returns (int)
     {
+
         int bidId = bidCount;
 
         bids[bidId].bidder = _sender;
@@ -127,6 +132,11 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
     /**
      * BidStore getter interface
      */
+
+    function getBidCount() external view returns (int)
+    {
+        return bidCount;
+    }
 
     function isPinned(int bidId) external view returns (bool)
     {
@@ -163,6 +173,11 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
         return bids[bidId].fileSize;
     }
 
+    function getDuration(int bidId) external view returns (uint)
+    {
+        return bids[bidId].duration;
+    }
+
     function getValidationPool(int bidId) external view returns (uint)
     {
         return bids[bidId].validationPool;
@@ -173,9 +188,14 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
         return bids[bidId].bidAmount;
     }
 
+    function getMinValidations(int bidId) external view returns (int16)
+    {
+        return bids[bidId].minValidations;
+    }
+
     function getValidationCount(int bidId) external view returns (uint)
     {
-        return bids[bidId].validations.length;
+        return validations[bidId].length;
     }
 
     function getValidatorIndex(int bidId, address payable _validator) external view returns (uint)
@@ -185,9 +205,9 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
             return uint(-1);
         }
 
-        for (uint i = 0; i < bids[bidId].validations.length; i++)
+        for (uint i = 0; i < validations[bidId].length; i++)
         {
-            if (bids[bidId].validations[i].validator == _validator)
+            if (validations[bidId][i].validator == _validator)
             {
                 return i;
             }
@@ -198,7 +218,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
     
     function getValidator(int bidId, uint idx) external view returns (address payable)
     {
-        return bids[bidId].validations[idx].validator;
+        return validations[bidId][idx].validator;
     }
 
     function getValidation(int bidId, uint idx) external view returns (
@@ -209,16 +229,16 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
     )
     {
         return (
-            bids[bidId].validations[idx].when,
-            bids[bidId].validations[idx].validator,
-            bids[bidId].validations[idx].isValid,
-            bids[bidId].validations[idx].paid
+            validations[bidId][idx].when,
+            validations[bidId][idx].validator,
+            validations[bidId][idx].isValid,
+            validations[bidId][idx].paid
         );
     }
 
     function getValidationIsValid(int bidId, uint idx) external view returns (bool)
     {
-        return bids[bidId].validations[idx].isValid;
+        return validations[bidId][idx].isValid;
     }
 
     function bidExists(int bidId) external view returns (bool)

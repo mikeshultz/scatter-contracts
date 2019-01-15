@@ -22,7 +22,7 @@ library Structures {
         address payable hoster;
         uint pinned;
         int16 minValidations;  // Also, kind of, minimum majority (e.g. win by X)
-        Validation[] validations;
+        //Validation[] validations;
     }
 
 }
