@@ -6,7 +6,7 @@ def main(assertions, web3, contracts, deployer_account, network):
     assert network is not None
 
     GAS_PRICE = int(3e9)
-    
+
     deployer_balance = web3.eth.getBalance(deployer_account)
 
     if network in ('dev', 'test'):
@@ -14,7 +14,7 @@ def main(assertions, web3, contracts, deployer_account, network):
         if deployer_balance == 0:
             fund_value = int(1e18)
             tx = web3.eth.sendTransaction({
-                'from': web3.eth.accounts[0], # The pre-funded account in ganace-cli
+                'from': web3.eth.accounts[0],  # The pre-funded account in ganace-cli
                 'to': deployer_account,
                 'value': fund_value,
                 'gasPrice': GAS_PRICE,
@@ -30,7 +30,6 @@ def main(assertions, web3, contracts, deployer_account, network):
     print("web3.net.version: {}".format(web3.net.version))
     print("deployer_account: {}".format(deployer_account))
     print("deployer_balance: {} Ether".format(deployer_balance / 1e18))
-    #Test = contracts.get('Test')
     print("contracts: ", contracts)
 
     ##
@@ -67,6 +66,12 @@ def main(assertions, web3, contracts, deployer_account, network):
     assert Env is not None, "Unable to get Env contract"
     env = Env.deployed()
     assert env.address is not None, "Deploy of Env failed.  No address found"
+    if Env.new_deployment is True:
+        router.functions.set(web3.sha3(text='Env'), env.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
 
     ##
     # Rewards Library
@@ -78,6 +83,12 @@ def main(assertions, web3, contracts, deployer_account, network):
             'SafeMath': safeMath.address,
         })
     assert rewards.address is not None, "Deploy of Rewards failed.  No address found"
+    if Rewards.new_deployment is True:
+        router.functions.set(web3.sha3(text='Rewards'), rewards.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
 
     ##
     # BidStore - Primary storage contract
@@ -85,8 +96,14 @@ def main(assertions, web3, contracts, deployer_account, network):
     BidStore = contracts.get('BidStore')
     assert BidStore is not None, "Unable to get BidStore contract"
 
-    store = BidStore.deployed(deployer_account, gas=int(6e6))
+    store = BidStore.deployed(router.address, gas=int(6e6))
     assert store.address is not None, "Deploy of BidStore failed.  No address found"
+    if BidStore.new_deployment is True:
+        router.functions.set(web3.sha3(text='BidStore'), store.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
 
     ##
     # Scatter - Primary contract
@@ -94,11 +111,30 @@ def main(assertions, web3, contracts, deployer_account, network):
     Scatter = contracts.get('Scatter')
     assert Scatter is not None, "Unable to get Scatter contract"
 
-    sb = Scatter.deployed(env.address, store.address, links={
+    sb = Scatter.deployed(router.address, links={
         'SafeMath': safeMath.address,
         'Rewards': rewards.address
         })
     assert sb.address is not None, "Deploy of Scatter failed.  No address found"
+    if Scatter.new_deployment is True:
+        router.functions.set(web3.sha3(text='Scatter'), sb.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        store.functions.updateReferences().transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+
+    # updateReferences in Scatter only if BidStore is a new deployment and Scatter is not
+    if BidStore.new_deployment is True and not Scatter.new_deployment:
+        sb.functions.updateReferences().transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
 
     store_sb_address = store.functions.scatterAddress().call()
     if store_sb_address != sb.address:
