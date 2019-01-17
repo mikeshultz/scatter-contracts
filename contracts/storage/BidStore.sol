@@ -3,14 +3,24 @@ pragma solidity ^0.5.2;
 import "../lib/Owned.sol";
 import "../lib/Structures.sol";
 import "../interface/IBidStore.sol";
+import "../interface/IRouter.sol";
 
 
+/* BidStore
+ * @title The primary persistance contract for storing Bids and Validations.
+ * @dev This contract is only intended to be used by the Scatter contract.
+ * @author Mike Shultz <mike@mikeshultz.com>
+ */
 contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that ref
+
+    bytes32 private constant SCATTER_HASH = keccak256("Scatter");
 
     int public bidCount;
     mapping(int => Structures.Bid) private bids;
     mapping(int => Structures.Validation[]) private validations;
     address public scatterAddress;
+
+    IRouter public router;
 
     modifier scatterOnly() {
         require(msg.sender == scatterAddress, "not allowed");
@@ -19,10 +29,11 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
 
     /** constructor(address)
      *  @dev initialize the contract
-     *  @param  _scatter    The address of the primary Scatter contract
+     *  @param  _router    The address of the Router contract
      */
-    constructor(address _scatter) public {
-        scatterAddress = _scatter;
+    constructor(address _router) public {
+        router = IRouter(_router);
+        updateReferences();
     }
 
     /** addValidation(int, address payable, bool)
@@ -437,6 +448,22 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
     function setBidCount(int _bidCount) public ownerOnly
     {
         bidCount = _bidCount;
+    }
+
+    /** updateReferences()
+     *  @dev Using the router, update all the addresses
+     *  @return bool If anything was updated
+     */
+    function updateReferences() public ownerOnly returns (bool)
+    {
+        bool updated = false;
+        address newScatterAddress = router.get(SCATTER_HASH);
+        if (newScatterAddress != scatterAddress)
+        {
+            scatterAddress = newScatterAddress;
+            updated = true;
+        }
+        return updated;
     }
 
 }

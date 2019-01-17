@@ -48,6 +48,7 @@ contract Scatter is Owned {  /// interface: IScatter
 
     Env public env;
     IBidStore public bidStore;
+    IRouter public router;
 
     mapping(address => uint) private balanceSheet;
     uint public remainderFunds;
@@ -58,19 +59,19 @@ contract Scatter is Owned {  /// interface: IScatter
     bytes32 private constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
     bytes32 private constant ENV_MIN_DURATION = keccak256("minDuration");
     bytes32 private constant ENV_MIN_BID = keccak256("minBid");
+    bytes32 private constant ENV_HASH = keccak256("Env");
+    bytes32 private constant BID_STORE_HASH = keccak256("BidStore");
 
     modifier notBanned() { require(!env.isBanned(msg.sender), "banned"); _; }
 
     /** constructor(address, address)
      *  @dev initialize the contract
-     *  @param  _env        The address of the deployed Env contract
-     *  @param _bidStore    The address of the deployed BidStore contract
+     *  @param  _router    The address of the Router contract
      */
-    constructor(address _env, address _bidStore) public
+    constructor(address _router) public
     {
-        owner = msg.sender;
-        env = Env(_env);
-        bidStore = IBidStore(_bidStore);
+        router = IRouter(_router);
+        updateReferences();
     }
 
     /** satisfied(int)
@@ -489,6 +490,30 @@ contract Scatter is Owned {  /// interface: IScatter
     function withdraw() public notBanned
     {
         transfer(msg.sender);
+    }
+
+    /** updateReferences()
+     *  @dev Using the router, update all the addresses
+     *  @return bool If anything was updated
+     */
+    function updateReferences() public ownerOnly returns (bool)
+    {
+        bool updated = false;
+
+        address newEnvAddress = router.get(ENV_HASH);
+        if (newEnvAddress != address(env))
+        {
+            env = Env(newEnvAddress);
+            updated = true;
+        }
+
+        address newBSAddress = router.get(BID_STORE_HASH);
+        if (newBSAddress != address(bidStore))
+        {
+            bidStore = IBidStore(newBSAddress);
+            updated = true;
+        }
+        return updated;
     }
 
     /** payout(int)
