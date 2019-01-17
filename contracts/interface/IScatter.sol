@@ -42,6 +42,7 @@ interface IScatter {
     event ValidationOcurred(int indexed bidId, address indexed validator, bool indexed isValid);
 
     function getJob() external view returns (int, bytes32, int);
+    function getBidCount() external view returns (int);
     function getValidation(int bidId, int idx) external view returns (uint, address, bool, bool);
     function getValidationCount(int bidId) external view returns (uint);
 

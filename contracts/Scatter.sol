@@ -33,6 +33,7 @@ contract Scatter is Owned {  /// interface: IScatter
         bytes32 fileHash,
         int64 fileSize
     );
+
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
     event Accepted(int indexed bidId, address indexed hoster);
@@ -41,9 +42,7 @@ contract Scatter is Owned {  /// interface: IScatter
     event NotAcceptedByPinner(int indexed bidId, address indexed hoster);
     event WithdrawFailed(address indexed sender, string reason);
     event Withdraw(uint indexed value, address indexed hoster);
-    event Paid(int indexed bidId, uint indexed value, address indexed validator);
     event ValidationOcurred(int indexed bidId, address indexed validator, bool indexed isValid);
-    event GeneralError(string why);
 
     Env public env;
     IBidStore public bidStore;
@@ -158,22 +157,6 @@ contract Scatter is Owned {  /// interface: IScatter
         return(sway >= minValid);
     }
 
-    function addValidation(int bidId, bool isValid)
-    internal
-    {
-        require(bidStore.isPinned(bidId), "not open");
-        require(bidStore.addValidation(bidId, msg.sender, isValid), "add failed");
-
-        uint whenPinned = bidStore.getPinned(bidId);
-        uint durationSeconds = bidStore.getDuration(bidId);
-        if (Rewards.durationHasPassed(whenPinned, durationSeconds))
-        {
-            payout(bidId);
-        }
-
-        emit ValidationOcurred(bidId, msg.sender, isValid);
-    }
-
     /**
      * Readers
      */
@@ -206,6 +189,12 @@ contract Scatter is Owned {  /// interface: IScatter
             }
         }
         return (-1, 0, 0);
+    }
+
+    function getBidCount()
+    external view returns (int)
+    {
+        return bidStore.getBidCount();
     }
 
     function getValidation(int bidId, uint idx) public view
@@ -261,50 +250,13 @@ contract Scatter is Owned {  /// interface: IScatter
     returns (bool)
     {
 
-        // Check value transfer
-        if (msg.value < bidValue.add(validationPool))
+        if (!validateBid(fileHash, fileSize, durationSeconds, bidValue, validationPool,
+            minValidations))
         {
-            revert("invalid value");
-        }
-
-        // Input Validation
-        if (fileHash == bytes32(0) || fileSize < 1)
-        {
-            emit BidInvalid(fileHash, "invalid file");
+            emit BidInvalid(fileHash, "failed validation");
             return false;
         }
 
-        if (fileHash == EMPTY_IPFS_FILE) // IPFS hash of a zero-length file
-        {
-            emit BidInvalid(fileHash, "empty file");
-            return false;
-        }
-
-        uint minDuration = env.getuint(ENV_MIN_DURATION);
-        if (durationSeconds < minDuration) // IPFS hash of a zero-length file
-        {
-            emit BidInvalid(fileHash, "duration low");
-            return false;
-        }
-
-        if (bidValue < 1)
-        {
-            emit BidInvalid(fileHash, "bid zero");
-            return false;
-        }
-
-        if (bidValue < env.getuint(ENV_MIN_BID))
-        {
-            emit BidTooLow(fileHash);
-            return false;
-        }
-
-        // Needs to be more than 0 and min divisible by participants
-        if (validationPool < uint(minValidations))
-        {
-            emit BidInvalid(fileHash, "zero pool");
-            return false;
-        }
         int bidId = bidStore.addBid(msg.sender, fileHash, fileSize, bidValue, validationPool,
                                     minValidations, durationSeconds);
 
@@ -376,23 +328,6 @@ contract Scatter is Owned {  /// interface: IScatter
         return true;
     }
 
-    function payout(int bidId)
-    internal
-    {   
-        uint validationPool = bidStore.getValidationPool(bidId);
-
-        // Payout
-        require(bidStore.getValidationCount(bidId) > 0, "non validators");
-        uint amountPaid = Rewards.payValidators(address(bidStore), bidId, balanceSheet);
-
-        uint remainder = validationPool - amountPaid;
-        if (remainder > 0)
-        {
-            remainderFunds += remainder;
-        }
-        Rewards.payHoster(address(bidStore), bidId, balanceSheet);
-    }
-
     function validate(int bidId)
     public notBanned
     {
@@ -434,6 +369,64 @@ contract Scatter is Owned {  /// interface: IScatter
     function withdraw() public notBanned
     {
         transfer(msg.sender);
+    }
+
+    function payout(int bidId)
+    internal
+    {
+        uint validationPool = bidStore.getValidationPool(bidId);
+
+        // Payout
+        require(bidStore.getValidationCount(bidId) > 0, "non validators");
+        uint amountPaid = Rewards.payValidators(address(bidStore), bidId, balanceSheet);
+
+        uint remainder = validationPool - amountPaid;
+        if (remainder > 0)
+        {
+            remainderFunds += remainder;
+        }
+        Rewards.payHoster(address(bidStore), bidId, balanceSheet);
+    }
+
+    function addValidation(int bidId, bool isValid)
+    internal
+    {
+        require(bidStore.isPinned(bidId), "not open");
+        require(bidStore.addValidation(bidId, msg.sender, isValid), "add failed");
+
+        uint whenPinned = bidStore.getPinned(bidId);
+        uint durationSeconds = bidStore.getDuration(bidId);
+        if (Rewards.durationHasPassed(whenPinned, durationSeconds))
+        {
+            payout(bidId);
+        }
+
+        emit ValidationOcurred(bidId, msg.sender, isValid);
+    }
+
+    function validateBid(
+        bytes32 fileHash,
+        int64 fileSize,
+        uint durationSeconds,
+        uint bidValue,
+        uint validationPool,
+        int16 minValidations
+    ) internal view returns (bool)
+    {
+        if (
+            msg.value < bidValue.add(validationPool)
+            || fileHash == bytes32(0) || fileSize < 1
+            || fileHash == EMPTY_IPFS_FILE
+            || bidValue < 1
+            || validationPool < uint(minValidations)
+            || bidValue < env.getuint(ENV_MIN_BID)
+            || durationSeconds < env.getuint(ENV_MIN_DURATION)
+        )
+        {
+            return false;
+        }
+
+        return true;
     }
 
 }
