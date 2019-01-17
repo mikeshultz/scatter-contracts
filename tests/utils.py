@@ -73,7 +73,6 @@ def get_event(web3contract, event_name, rcpt):
 
     for log in rcpt.logs:
         evnt_data = get_event_data(abi, log)
-        print('get_event evnt_data', evnt_data, file=sys.stderr)
         return evnt_data
     return None
 
@@ -95,10 +94,11 @@ def time_travel(web3, secs):
     """ Time travel the chain """
     block_before = web3.eth.getBlock('latest')
     now = int(datetime.now().timestamp())
+    drift = 30  # A magical amount of correction for drift that eth_tester sometimes has
 
     # eth_tester
     try:
-        web3.testing.timeTravel(now + secs)
+        web3.testing.timeTravel(now + secs + drift)
         web3.testing.mine(1)  # Get one block in, at least
     except ValueError as err:
         if 'not supported' in str(err):
@@ -116,7 +116,8 @@ def time_travel(web3, secs):
     block_after = web3.eth.getBlock('latest')
     assert block_before.number < block_after.number, "Time travel failed"
     stamp_diff = int(block_after.timestamp) - int(block_before.timestamp)
-    assert stamp_diff >= secs, "Not enough time passed.  Only {} seconds.".format(stamp_diff)
+
+    assert stamp_diff >= secs, "Not enough time passed.  Only {} seconds.  Wanted {} seconds.".format(stamp_diff, secs)
 
 
 def block_travel(web3: Web3, blocks: int):

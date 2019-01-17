@@ -6,6 +6,7 @@ The general process for bidding:
 
 1) User submits a bid for a file to be hosted
 """
+from hexbytes import HexBytes
 from .utils import (
     get_accounts,
     std_tx,
@@ -17,15 +18,18 @@ from .utils import (
 from .consts import (
     MAIN_CONTRACT_NAME,
     STORE_CONTRACT_NAME,
-    ENV_CONTRACT_NAME,
+    EMPTY_FILE_HASH,
     FILE_HASH_1,
     FILE_SIZE_1,
     DURATION_1,
     FILE_HASH_2,
     FILE_SIZE_2,
     DURATION_2,
+    ENV_CONTRACT_NAME,
     ENV_ACCEPT_WAIT,
     ENV_DEFAULT_MIN_VALIDATIONS,
+    ENV_MIN_BID,
+    ENV_MIN_DURATION,
 )
 
 
@@ -493,3 +497,155 @@ def test_withdraw(web3, contracts):
     seen_difference = hoster_balance_after - hoster_balance_before
     predicted_difference = hoster_withdraw_evnt.args.value - (gas_price * med_gas)
     assert seen_difference - predicted_difference < (gas_price * med_gas), "Invalid change"
+
+
+def test_invalid_bids(web3, contracts):
+    """ Test that the contract responds properly to invalid bids """
+
+    _, bidder, _, _, _, _, banned = get_accounts(web3)
+
+    scatter = contracts.get(MAIN_CONTRACT_NAME)
+    env = contracts.get(ENV_CONTRACT_NAME)
+
+    bid_value = int(1e18)  # 1 Ether
+    validation_value = int(1e17)  # 0.1 Ether
+    gas = int(3e6)
+
+    orig_bid_count = scatter.functions.getBidCount().call()
+
+    # Test not enough value transferred
+    bid1_hash = scatter.functions.bid(
+        FILE_HASH_1,
+        FILE_SIZE_1,
+        DURATION_1,
+        bid_value,
+        validation_value
+    ).transact(std_tx({
+        'from': bidder,
+        'gas': gas,
+        'value': bid_value,
+    }))
+    bid1_receipt = web3.eth.waitForTransactionReceipt(bid1_hash)
+    assert bid1_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid1_receipt)
+    assert has_event(scatter, 'BidInvalid', bid1_receipt), 'BidInvalid event not found'
+
+    # Assert there have been no new bids added
+    assert orig_bid_count == scatter.functions.getBidCount().call()
+
+    # Test fileHash of 0
+    bid2_hash = scatter.functions.bid(
+        HexBytes('0x0'),
+        FILE_SIZE_1,
+        DURATION_1,
+        bid_value,
+        validation_value
+    ).transact(std_tx({
+        'from': bidder,
+        'gas': gas,
+        'value': bid_value + validation_value,
+    }))
+    bid2_receipt = web3.eth.waitForTransactionReceipt(bid2_hash)
+    assert bid2_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid2_receipt)
+    assert has_event(scatter, 'BidInvalid', bid2_receipt), 'BidInvalid event not found'
+
+    # Assert there have been no new bids added
+    assert orig_bid_count == scatter.functions.getBidCount().call()
+
+    # Test 'Empty' IPFS file hash
+    bid3_hash = scatter.functions.bid(
+        EMPTY_FILE_HASH,
+        FILE_SIZE_1,
+        DURATION_1,
+        bid_value,
+        validation_value
+    ).transact(std_tx({
+        'from': bidder,
+        'gas': gas,
+        'value': bid_value + validation_value,
+    }))
+    bid3_receipt = web3.eth.waitForTransactionReceipt(bid3_hash)
+    assert bid3_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid3_receipt)
+    assert has_event(scatter, 'BidInvalid', bid3_receipt), 'BidInvalid event not found'
+
+    # Assert there have been no new bids added
+    assert orig_bid_count == scatter.functions.getBidCount().call()
+
+    # Test bidValue of 0
+    bid4_hash = scatter.functions.bid(
+        FILE_HASH_1,
+        FILE_SIZE_1,
+        DURATION_1,
+        0,
+        validation_value
+    ).transact(std_tx({
+        'from': bidder,
+        'gas': gas,
+        'value': bid_value + validation_value,
+    }))
+    bid4_receipt = web3.eth.waitForTransactionReceipt(bid4_hash)
+    assert bid4_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid4_receipt)
+    assert has_event(scatter, 'BidInvalid', bid4_receipt), 'BidInvalid event not found'
+
+    # Assert there have been no new bids added
+    assert orig_bid_count == scatter.functions.getBidCount().call()
+
+    # Test a validation pool that's indivisible by minValidations
+    bid5_hash = scatter.functions.bid(
+        FILE_HASH_1,
+        FILE_SIZE_1,
+        DURATION_1,
+        bid_value,
+        2,
+        3
+    ).transact(std_tx({
+        'from': bidder,
+        'gas': gas,
+        'value': bid_value + validation_value,
+    }))
+    bid5_receipt = web3.eth.waitForTransactionReceipt(bid5_hash)
+    assert bid5_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid5_receipt)
+    assert has_event(scatter, 'BidInvalid', bid5_receipt), 'BidInvalid event not found'
+
+    # Assert there have been no new bids added
+    assert orig_bid_count == scatter.functions.getBidCount().call()
+
+    # Test bidValue less than the minimum set in Env
+    minValue = env.functions.getuint(ENV_MIN_BID).call()
+    if minValue > 0:
+        bid6_hash = scatter.functions.bid(
+            FILE_HASH_1,
+            FILE_SIZE_1,
+            DURATION_1,
+            minValue - 1,
+            validation_value
+        ).transact(std_tx({
+            'from': bidder,
+            'gas': gas,
+            'value': bid_value + validation_value,
+        }))
+        bid6_receipt = web3.eth.waitForTransactionReceipt(bid6_hash)
+        assert bid6_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid6_receipt)
+        assert has_event(scatter, 'BidInvalid', bid6_receipt), 'BidInvalid event not found'
+
+        # Assert there have been no new bids added
+        assert orig_bid_count == scatter.functions.getBidCount().call()
+
+    # Test duration less than the minimum duration stored in Env
+    minDuration = env.functions.getuint(ENV_MIN_DURATION).call()
+    bid7_hash = scatter.functions.bid(
+        FILE_HASH_1,
+        FILE_SIZE_1,
+        minDuration - 1,
+        bid_value,
+        validation_value
+    ).transact(std_tx({
+        'from': bidder,
+        'gas': gas,
+        'value': bid_value + validation_value,
+    }))
+    bid7_receipt = web3.eth.waitForTransactionReceipt(bid7_hash)
+    assert bid7_receipt.status == 1, "Bid transaction failed. Receipt: {}".format(bid7_receipt)
+    assert has_event(scatter, 'BidInvalid', bid7_receipt), 'BidInvalid event not found'
+
+    # Assert there have been no new bids added
+    assert orig_bid_count == scatter.functions.getBidCount().call()

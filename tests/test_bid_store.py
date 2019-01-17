@@ -34,7 +34,7 @@ from .consts import (
 def test_store_admin_funcs(web3, contracts):
     """ Test a simple addBid """
     admin, nobody, _, _, _, _, Scatter = get_accounts(web3)
-    
+
     bidStore = contracts.get(STORE_CONTRACT_NAME)
 
     # Set the Scatter address
