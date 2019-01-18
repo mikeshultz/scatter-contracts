@@ -146,4 +146,28 @@ def main(assertions, web3, contracts, deployer_account, network):
         set_receipt = web3.eth.waitForTransactionReceipt(set_hash)
         assert set_receipt.status == 1
 
+    ##
+    # UserStore - HashStore storage for user registrations
+    ##
+    UserStore = contracts.get('HashStore')
+    assert UserStore is not None, "Unable to get UserStore contract"
+
+    userStore = UserStore.deployed(router.address)
+    assert userStore.address is not None, "Deploy of UserStore failed.  No address found"
+
+    ##
+    # Register - Contrat handling user registrations
+    ##
+    Register = contracts.get('Register')
+    assert Register is not None, "Unable to get Register contract"
+
+    register = Register.deployed(router.address)
+    assert register.address is not None, "Deploy of Register failed.  No address found"
+    if Register.new_deployment is True or UserStore.new_deployment is True:
+        userStore.setWriter(register.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+            })
+
     return True
