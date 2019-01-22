@@ -147,13 +147,20 @@ def main(assertions, web3, contracts, deployer_account, network):
         assert set_receipt.status == 1
 
     ##
-    # UserStore - HashStore storage for user registrations
+    # UserStore - UserStore storage for user registrations
     ##
-    UserStore = contracts.get('HashStore')
+    UserStore = contracts.get('UserStore')
     assert UserStore is not None, "Unable to get UserStore contract"
 
-    userStore = UserStore.deployed(router.address)
+    userStore = UserStore.deployed()
     assert userStore.address is not None, "Deploy of UserStore failed.  No address found"
+
+    if UserStore.new_deployment is True:
+        router.functions.set(web3.sha3(text='UserStore'), userStore.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
 
     ##
     # Register - Contrat handling user registrations
@@ -163,8 +170,16 @@ def main(assertions, web3, contracts, deployer_account, network):
 
     register = Register.deployed(router.address)
     assert register.address is not None, "Deploy of Register failed.  No address found"
+
+    if Register.new_deployment is True:
+        router.functions.set(web3.sha3(text='Register'), register.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+
     if Register.new_deployment is True or UserStore.new_deployment is True:
-        userStore.setWriter(register.address).transact({
+        userStore.functions.setWriter(register.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
