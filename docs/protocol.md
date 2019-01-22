@@ -10,6 +10,7 @@ On initial `bid`, a `challenge` is created using the block hash of the `bid` tra
 
     seed = blockHash
     chunkSize = 1000
+
     if seed > fileSize:
         chunkStart = hash(seed + hosterAddress) % filesize - chunkSize
     else:
