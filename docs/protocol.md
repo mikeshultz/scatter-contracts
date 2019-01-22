@@ -21,9 +21,11 @@ On initial bid, a challenge is created for with the block number of the bid bein
     uniqueHash = hash(chunk)
     signature = sign(uniqueHash)
 
-The hoster takes `chunk` and hashes it to create their `uniqueHash`. They then sign the hash and submit the `signature` and `uniqueHash` to the chain. Every hoster validates the `uniqueHash` hash and `signature` against the the file they're hosting. If they determine the validation is false, they issue a `dispute`.
+The hoster takes `chunk` and hashes it to create their `uniqueHash`. They then sign the hash and submit the `signature` and `uniqueHash` to the chain. Every hoster validates the `uniqueHash` hash and `signature` against the the file they're hosting. If they determine the validation is false, they issue a `challenge`.
 
-Upon a `dispute`, a `mediator` joins the fight by fetching the file and performing thier own hash and verification of the provided `uniqueHash`s and `signature`s. They submit their determination.  Whoever wins the challeng can claim the stake of the loser, splitting it with the `mediator`. If a hoster loses more than `maxLosses` their account is banned.
+Upon a `challenge`, both hosters must complete the challenge to `defend` themselves and provide the `hash` and `signature` of of the file using the provided `seed`. A `mediator` joins the fight by fetching the file and performing thier own hash and verification of the provided `uniqueHash`s and `signature`s. They submit their determination.  Whoever wins the challeng can claim the stake of the loser, splitting it with the `mediator`. If a hoster loses more than `maxLosses` their account is banned.
+
+A challenge can only be made every `durationSeconds / 3` interval for up to a maximum of 3 challenges per fire.
 
 Upon completion of the duration, each hoster can make a `claim` on the funds.  If the bid has passed validations and has no open challenges, their balances are updated.
 
