@@ -6,7 +6,7 @@
 
 There will be exactly 2 hosters.  They must each stake 1/2 of the value of the bid.
 
-On initial `bid`, a `challenge` is created for with the block number of the `bid` transaction being the challenge `seed`. The `seed` added to their unique `hosterIndex` is used to find the `chunkStart` (the first position of a hash). The `chunkStart` plus 1,000 bytes of the file is the size(or until EOF if the file is smaller than 1KB) of the `chunk`. If the `fileSize` is greater than `seed`, subtract `fileSize` from `seed` and try again.
+On initial `bid`, a `challenge` is created using the block number of the `bid` transaction as the challenge `seed`. The `seed` added to their unique `hosterIndex` is used to find the `chunkStart` (the first position of a hash). The `chunkStart` plus 1,000 bytes of the file (or until EOF if the file is smaller than 1KB) is the size of the `chunk`. If the `fileSize` is greater than `seed`, subtract `fileSize` from `seed` and try again.
 
     seed = blockNumber
     if seed > fileSize:
