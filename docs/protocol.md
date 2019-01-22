@@ -39,12 +39,12 @@ Bidder makes their bid.
 hoster1 signals intent and puts up their stake, pins the file, performs the hash and signature and submits
 
     stake(bidId) # with value
-    pinned(bidId, uniqueSignature)
+    pinned(bidId, uniqueHash, uniqueSignature)
 
 hoster2 does the same
 
     stake(bidId) # with value
-    pinned(bidId, uniqueSignature)
+    pinned(bidId, uniqueHash, uniqueSignature)
 
 hoster1 can not confirm hoster2's signature and submits a challenge
 
@@ -52,11 +52,11 @@ hoster1 can not confirm hoster2's signature and submits a challenge
 
 hoster2 defends themselves
 
-    defend(pinId, uniqueSignature)
+    defend(pinId, uniqueHash, uniqueSignature)
 
 Both hosters must complete the challenge
 
-    defend(pinId, uniqueSignature)
+    defend(pinId, uniqueHash, uniqueSignature)
 
 mediator rules. If hoster1 wins, they claim the stake of hoster2 splitting it with the mediator(80/20). This also opens a spot for another hoster to join with their own stake to fill the second spot.
 
