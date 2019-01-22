@@ -35,14 +35,24 @@ interface IScatter {
     );
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
-    event Accepted(int indexed bidId, address indexed hoster);
+    event Accepted(int indexed bidId, uint indexed when, address indexed hoster);
     event AcceptWait(int waitLeft);
     event Pinned(int indexed bidId, address indexed hoster, bytes32 fileHash);
     event NotAcceptedByPinner(int indexed bidId, address indexed hoster);
     event ValidationOcurred(int indexed bidId, address indexed validator, bool indexed isValid);
 
+    function getBid(int bidId) external view returns (
+        address,
+        bytes32,
+        int,
+        uint,
+        uint,
+        uint,
+        int16
+    );
     function getJob() external view returns (int, bytes32, int);
     function getBidCount() external view returns (int);
+    function getHoster(int bidId) external view returns (address);
     function getValidation(int bidId, int idx) external view returns (uint, address, bool, bool);
     function getValidationCount(int bidId) external view returns (uint);
 
