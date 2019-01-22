@@ -25,6 +25,10 @@ The hoster takes `chunk` and hashes it to create their `uniqueHash`. They then s
 
 Upon a `dispute`, a `mediator` joins the fight by fetching the file and performing thier own hash and verification of the provided `uniqueHash`s and `signature`s. They submit their determination.  Whoever wins the challeng can claim the stake of the loser, splitting it with the `mediator`. If a hoster loses more than `maxLosses` their account is banned.
 
+Upon completion of the duration, each hoster can make a `claim` on the funds.  If the bid has passed validations and has no open challenges, their balances are updated.
+
+If any participant has a balance, they may `withdraw` at any time.
+
 
 ## Contract Calls
 
@@ -63,16 +67,10 @@ With only one hoster now, hoster3 takes the spot
     stake(bidId) # with value
     pinned(bidId, uniqueSignature)
 
+After the duration has been complete and there are no open challenges, each of the hosters can claim their funds and stake.
 
+    claim(bidId) # Updates their balances appropriately
 
+And withdraw whenever, or continue using the funds in the contract.
 
-
-
-
-
-
-
-
-
-
-
+    withdraw()
