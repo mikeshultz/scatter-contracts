@@ -36,12 +36,12 @@ Bidder makes their bid.
 
     bid(fileHash, fileSize, bidValue)
 
-hoster1 signals intent, pins the file, performs the hash and signature and submits
+hoster1 signals intent and puts up their stake, pins the file, performs the hash and signature and submits
 
     stake(bidId) # with value
     pinned(bidId, uniqueSignature)
 
-hoster2 signals intent, pins the file, performs the hash and signature and submits
+hoster2 does the same
 
     stake(bidId) # with value
     pinned(bidId, uniqueSignature)
