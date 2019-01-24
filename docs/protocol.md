@@ -77,3 +77,5 @@ The contract combines these hashes and verifies each pinner's signature of these
     hash2 = hash2_a + hash2_b
     verify_signature(hash1, sig1)
     verify_signature(hash2, sig2)
+
+If either signature can not be verified, all stakes are burned and the user is given a refund.
