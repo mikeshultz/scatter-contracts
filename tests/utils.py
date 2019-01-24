@@ -5,6 +5,7 @@ from attrdict import AttrDict
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import get_event_data
+from eth_utils import add_0x_prefix, remove_0x_prefix, to_hex
 from .consts import DEPLOYER_ACCOUNT, STD_GAS, STD_GAS_PRICE
 
 

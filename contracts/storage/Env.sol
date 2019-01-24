@@ -15,10 +15,9 @@ contract Env is Owned {
     mapping (bytes32 => uint) internal varUints;
     mapping (address => bool) internal banned;
 
-    bytes32 private constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
-    bytes32 private constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
     bytes32 private constant ENV_MIN_DURATION = keccak256("minDuration");
     bytes32 private constant ENV_MIN_BID = keccak256("minBid");
+    bytes32 private constant ENV_REQUIRED_PINNERS = keccak256("requiredPinners");
 
     /** constructor()
      *  @dev Initialize this contract
@@ -27,9 +26,8 @@ contract Env is Owned {
     {
         // Presets
         varUints[ENV_MIN_BID] = 0;
-        varUints[ENV_DEFAULT_MIN_VALIDATIONS] = 2;
+        varUints[ENV_REQUIRED_PINNERS] = 2;
         varUints[ENV_MIN_DURATION] = 1 weeks;
-        varUints[ENV_ACCEPT_HOLD_DURATION] = 15 minutes;
 
         banned[0x0000000000000000000000000000000000000000] = true;
     }

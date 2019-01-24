@@ -1,13 +1,33 @@
 pragma solidity >0.4.0 <0.6.0;
 
+
 library Structures {
-    
-    struct Validation {
-        int bidId;
+
+    struct Defense {
+        int bidID;
+        int challengeID;
+        int defenseID;
         uint when;
-        address payable validator;
-        bool isValid;
-        bool paid;
+        address payable pinner;
+        bytes32 uniqueHash;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+    
+    struct Challenge {
+        int bidID;
+        int challengeID;
+        uint when;
+        address payable challenger;
+        int[] defenses;
+    }
+    
+    struct Stake {
+        int bidID;
+        uint when;
+        uint value;
+        address payable staker;
     }
 
     struct Bid {
@@ -15,14 +35,11 @@ library Structures {
         bytes32 fileHash;
         int64 fileSize;
         uint bidAmount;
-        uint validationPool;
         uint duration;
-        uint accepted;
+        int8 requiredPinners;
         bool paid;
-        address payable hoster;
-        uint pinned;
-        int16 minValidations;  // Also, kind of, minimum majority (e.g. win by X)
-        //Validation[] validations;
+        address payable[] pinners;
+        int[] challenges;
     }
 
 }
