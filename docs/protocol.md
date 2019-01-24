@@ -28,7 +28,7 @@ If any of the pinners fail the challenge outright, all of their stakes are burne
 A "chunk" in this context, is a binary piece of the pinned file.  The processes to determine which chunks needs to be hashed need to be fairly hard to fake and repeatable between all participants.  Given the same state and parameters, the same chunks of a file must be chosen in an idempotent way.
 
     nonce = 1  # or 2, given by whether this is hash1 or hash2
-    seed = blockHash
+    seed = blockHash  # The blockHash of the block the challenge was made
     chunkSize = 1000
     chunkStart = hash(seed + hosterAddress + nonce) % filesize
     if seed > fileSize:
