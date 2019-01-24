@@ -21,6 +21,8 @@ Step 4 can be repeated up to 3 times of the life of the staked bid.
 
 This is the simplest way to conceptually enforce good actors without a complex form of validators and dispute resolution/arbitration.  Basically, if the pinners can not prove that they both have a copy of the file, they both lose their stakes.  This process is satisfied through a challenge process that asks the pinners to both complete a challenge.  This challenge requires them to both present two halves the result to prove they both see the same data.
 
+If any of the pinners fail the challenge outright, all of their stakes are burned.
+
 ## Chunk Derivation
 
 A "chunk" in this context, is a binary piece of the pinned file.  The processes to determine which chunks needs to be hashed need to be fairly hard to fake and repeatable between all participants.  Given the same state and parameters, the same chunks of a file must be chosen in an idempotent way.
