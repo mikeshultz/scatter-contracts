@@ -17,9 +17,7 @@ contract BidStore is Owned {  // Also is IBidStore, but solc doesn't like that r
 
     int public bidCount;
     mapping(int => Structures.Bid) private bids;
-    mapping(int => address payable) private stakes;
     address public scatterAddress;
-    //address public pinStakeAddress;
 
     IRouter public router;
 
