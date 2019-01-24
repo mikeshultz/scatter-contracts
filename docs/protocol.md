@@ -4,77 +4,74 @@
 
 ## Overview
 
-There will be exactly 2 hosters.  They must each stake 1/2 of the value of the bid.
+There are two types of particpants involved in the system.  The bidder and the pinner.  The bidder needs a file pinned on IPFS and the pinners want to make a little Ether.  The general steps of the protocol go as follows:
 
-On initial `bid`, a `challenge` is created using the block hash of the `bid` transaction as the challenge `seed`. The `seed` added to the hoster's `address`, hashed, and the modulo of the hash is used to find the `chunkStart` (the first position of a chunk to hash). The size of the `chunk` is determined by `chunkStart` plus 1,000 bytes of the file. If the `chunkStart + chunkSize` is greater than `fileSize`, only take the chunk to EOF.
+1) The bidder Joseph constructs a bid with a value, minimum required pinners, and duration
+2) Pinner Andy finds these terms agreeable, so he puts up a stake of half of the bid value
+3) Pinner Bruce does the same.
+4) Scatter creates a *challenge*, that both Andy and Bruce need to complete. (Details of the challenge are below.)
+5a) The challenge is a success, proving that both Andy and Bruce posess a copy of the file
+5b) The challenge fails, and both of their stakes are burned
+5c) Bruce fails to respond to the challenge in time.  His stake is burned leaving a slot open for a new pinner to complete his half of the challenge.
+6) The duration has passed, the stakes are returned, and the bid value is split between the pinners.
 
+Step 4 can be repeated up to 3 times of the life of the staked bid.
+
+## Mutually Assured Destruction
+
+This is the simplest way to conceptually enforce good actors without a complex form of validators and dispute resolution/arbitration.  Basically, if the pinners can not prove that they both have a copy of the file, they both lose their stakes.  This process is satisfied through a challenge process that asks the pinners to both complete a challenge.  This challenge requires them to both present two halves the result to prove they both see the same data.
+
+## Chunk Derivation
+
+A "chunk" in this context, is a binary piece of the pinned file.  The processes to determine which chunks needs to be hashed need to be fairly hard to fake and repeatable between all participants.  Given the same state and parameters, the same chunks of a file must be chosen in an idempotent way.
+
+    nonce = 1  # or 2, given by whether this is hash1 or hash2
     seed = blockHash
     chunkSize = 1000
-
+    chunkStart = hash(seed + hosterAddress + nonce) % filesize
     if seed > fileSize:
-        chunkStart = hash(seed + hosterAddress) % filesize - chunkSize
-    else:
-        chunkStart = hash(seed + hosterAddress) % filesize
+        chunkStart -= chunkSize
 
     if chunkStart + chunkSize > fileSize:
         chunkSize = fileSize - chunkStart
 
     chunk = file[chunkStart:chunkStart + chunkSize]
-    uniqueHash = hash(chunk)
-    signature = sign(uniqueHash)
 
-The hoster takes `chunk` and hashes it to create their `uniqueHash`. They then sign the hash and submit the `signature` and `uniqueHash` to the chain. Every hoster validates the `uniqueHash` and `signature` against the the file they're hosting. If they determine the validation is false, they issue a `challenge`.
+## Challenge
 
-Upon a `challenge`, both hosters must complete the `challenge` to `defend` themselves and provide the `uniqueHash` and `signature` of of the file using the provided `seed`. A `mediator` joins the fight by fetching the file and performing thier own hash and verification of the provided `uniqueHash`s and `signature`s. They submit their determination.  Whoever wins the `challenge` can `claim` the stake of the loser, splitting it with the `mediator`. If a hoster loses a challenge more than `maxLosses` per month their account is banned.
+A challenge is a request for pinners to verify they posess the files. One is created once both stakes have been provided.  A challenge can be triggered by anyone, but only every `durationSeconds / 3` interval for up to a maximum of 3 challenges per file. Each pinner is given a nonce, which is just the order that they staked the bid. This nonce is used to derive the chunk they're to sign, and which half of the hashes to provide.
 
-A challenge can only be made every `durationSeconds / 3` interval for up to a maximum of 3 challenges per fire.
+If the pinner's nonce is `1`, they provide the first half of the hashes and sign the first hash.  If the nonce is `2`, they provide the second half of the hashes and sign the second hash.
 
-Upon completion of the duration, each hoster can make a `claim` on the funds.  If the bid has passed validations and has no open challenges, their balances are updated.
+In the ongoing example, Andy's `nonce` is `1`, and Bruce's `nonce` is `2`.  
 
-If any participant has a balance, they may `withdraw` at any time.
+### Pinner Andy
 
+Andy computes the two chunks according to the protocol, hashes them both, and signs the first hash.  He submits the first half of each hash and his signature of the first hash to the contract.
 
-## Contract Calls
+    chunk1 = derive_chunk(file, nonce=1)
+    chunk2 = derive_chunk(file, nonce=2)
+    hash1 = hash(chunk1)
+    hash2 = hash(chunk2)
+    sig1 = sign(hash1)
+    scatter.defend(hash1[:32], hash2[:32], sig1)
 
-Bidder makes their bid.
+### Pinner Bruce
 
-    bid(fileHash, fileSize, bidValue) # with value
+Andy computes the two chunks according to the protocol, hashes them both, and signs the second hash.  He submits the second half of each hash and his signature of the second hash to the contract.
 
-hoster1 signals intent and puts up their stake, pins the file, performs the hash and signature and submits
+    chunk1 = derive_chunk('a', file, nonce=1)
+    chunk2 = derive_chunk('b', file, nonce=2)
+    hash1 = hash(chunk1)
+    hash2 = hash(chunk2)
+    sig2 = sign(hash2)
+    scatter.defend(hash1[32:], hash2[32:], sig2)
 
-    stake(bidId) # with value
-    pinned(bidId, uniqueHash, uniqueSignature)
+### Scatter Contract
 
-hoster2 does the same
+The contract combines these hashes and verifies each pinner's signature of these hashes, proving that both pinners are looking at the same file.
 
-    stake(bidId) # with value
-    pinned(bidId, uniqueHash, uniqueSignature)
-
-hoster1 can not confirm hoster2's signature and submits a challenge
-
-    challenge(pinId, seed)
-
-hoster2 defends themselves
-
-    defend(pinId, uniqueHash, uniqueSignature)
-
-Both hosters must complete the challenge
-
-    defend(pinId, uniqueHash, uniqueSignature)
-
-Then mediator makes their ruling. If hoster1 wins, they claim the stake of hoster2 splitting it with the mediator(80/20)
-
-    mediate(challengeId, validity)
-
-This also opens a spot for hoster3 to join with their own stake to fill the spot lost from the failed challenge.
-
-    stake(bidId) # with value
-    pinned(bidId, uniqueSignature)
-
-After the duration has been complete and there are no open challenges, each of the hosters can claim their funds and stake.
-
-    claim(bidId) # Updates their balances appropriately
-
-And withdraw whenever, or continue using the funds in the contract.
-
-    withdraw() # Transfers value to the sender
+    hash1 = hash1_a + hash1_b
+    hash2 = hash2_a + hash2_b
+    verify_signature(hash1, sig1)
+    verify_signature(hash2, sig2)
