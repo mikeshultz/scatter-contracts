@@ -1,6 +1,6 @@
 """ Tests for PinStake """
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
 )
 from .consts import (
@@ -9,9 +9,10 @@ from .consts import (
 )
 
 
-def test_add_stake(web3, contracts):
+def test_add_stake(web3, contracts, local_accounts):
     """ Test addstake """
-    owner, staker, _, _, _, _, Scatter = get_accounts(web3)
+    owner = local_accounts[0].address
+    staker, _, _, _, _, Scatter = get_remote_accounts(web3)
 
     bidID = 12345
     stakeValue = int(1e18)

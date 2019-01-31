@@ -1,6 +1,5 @@
 """ Tests for the Router contract """
 from .utils import (
-    get_accounts,
     std_tx,
 )
 from .consts import (
@@ -10,10 +9,10 @@ from .consts import (
 )
 
 
-def test_router(web3, contracts):
+def test_router(web3, contracts, local_accounts):
     """ Test the Router contract """
 
-    admin, _, _, _, _, _, _ = get_accounts(web3)
+    admin = local_accounts[0].address
 
     test_name = web3.sha3(text='thisnamecannotbeactuallyusedbecausereasons')
 

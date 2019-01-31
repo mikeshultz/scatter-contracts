@@ -1,6 +1,6 @@
 """ Tests for UserStore contract """
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
     normalize_filehash,
 )
@@ -11,9 +11,10 @@ from .consts import (
 )
 
 
-def test_storage(web3, contracts):
+def test_storage(web3, contracts, local_accounts):
     """ Test storage operations with UserStore """
-    owner, writer, _, _, _, _, _ = get_accounts(web3)
+    owner = local_accounts[0].address
+    writer, _, _, _, _, _ = get_remote_accounts(web3)
 
     userStore = contracts.get(USER_STORE_CONTRACT_NAME)
 

@@ -1,7 +1,7 @@
 """ Tests for ChallengeStore """
 from datetime import datetime
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
 )
 from .consts import (
@@ -9,9 +9,10 @@ from .consts import (
 )
 
 
-def test_add_challenge(web3, contracts):
+def test_add_challenge(web3, contracts, local_accounts):
     """ Test a simple addChallenge """
-    owner, challenger, _, _, _, _, Scatter = get_accounts(web3)
+    owner = local_accounts[0].address
+    challenger, _, _, _, _, Scatter = get_remote_accounts(web3)
 
     challengeStore = contracts.get(CHALLENGE_STORE_CONTRACT_NAME)
 

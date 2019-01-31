@@ -9,7 +9,7 @@ The general process for bidding:
 import pytest
 from hexbytes import HexBytes
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
     has_event,
     get_event,
@@ -48,7 +48,7 @@ def calculate_sway(min_valid, validations):
 
 def test_standard_bid(web3, contracts):
     """ Test a simple bid with minimum validations set """
-    _, bidder, _, _, _, _, _ = get_accounts(web3)
+    bidder, _, _, _, _, _ = get_remote_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     bidStore = contracts.get(STORE_CONTRACT_NAME)
@@ -95,7 +95,7 @@ def test_standard_bid(web3, contracts):
 def test_bid_with_required_pinners(web3, contracts):
     """ Test a simple bid with requiredPinners set """
     global used_bid_IDs
-    _, bidder, _, _, _, _, _ = get_accounts(web3)
+    bidder, _, _, _, _, _ = get_remote_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
 
@@ -134,7 +134,7 @@ def test_bid_with_required_pinners(web3, contracts):
 def test_stake(web3, contracts):
     """ Test accepting bids """
     global used_bid_IDs
-    _, bidder, pinner1, pinner2, _, _, _ = get_accounts(web3)
+    bidder, pinner1, pinner2, _, _, _ = get_remote_accounts(web3)
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     bidStore = contracts.get(STORE_CONTRACT_NAME)
     pinStake = contracts.get(PIN_STAKE_CONTRACT_NAME)
@@ -197,7 +197,7 @@ def test_stake(web3, contracts):
 def test_pinned(web3, contracts):
     """ Test a simple bid with minimum validations set """
     global used_bid_IDs
-    _, bidder, pinner1, pinner2, _, jake, _ = get_accounts(web3)
+    bidder, pinner1, pinner2, _, jake, _ = get_remote_accounts(web3)
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     pinStake = contracts.get(PIN_STAKE_CONTRACT_NAME)
 
@@ -288,7 +288,7 @@ def test_pinned(web3, contracts):
 def test_withdraw(web3, contracts):
     """ Test withdraw functionality """
 
-    _, bidder, hoster, validator1, validator2, validator3, kristen = get_accounts(web3)
+    bidder, hoster, validator1, validator2, validator3, kristen = get_remote_accounts(web3)
     scatter = contracts.get(MAIN_CONTRACT_NAME)
 
     bid_value = int(1e18)  # 1 Ether
@@ -393,7 +393,7 @@ def test_withdraw(web3, contracts):
 def test_invalid_bids(web3, contracts):
     """ Test that the contract responds properly to invalid bids """
 
-    _, bidder, _, _, _, _, banned = get_accounts(web3)
+    bidder, _, _, _, _, banned = get_remote_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     env = contracts.get(ENV_CONTRACT_NAME)

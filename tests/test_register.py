@@ -1,5 +1,5 @@
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     normalize_filehash,
 )
 from .consts import (
@@ -15,7 +15,7 @@ from .consts import (
 
 def test_simple_registration(web3, contracts):
     """ Test a simple bid with minimum validations set """
-    _, bidder, joe, mike, _, _, _ = get_accounts(web3)
+    bidder, joe, mike, _, _, _ = get_remote_accounts(web3)
 
     register = contracts.get(REGISTER_CONTRACT_NAME)
     userStore = contracts.get(USER_STORE_CONTRACT_NAME)

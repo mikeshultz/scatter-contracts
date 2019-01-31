@@ -1,6 +1,6 @@
 """ Tests for the Env contract """
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
 )
 from .consts import (
@@ -12,10 +12,10 @@ from .consts import (
 )
 
 
-def test_env_owner(web3, contracts):
+def test_env_owner(web3, contracts, local_accounts):
     """ Make sure owner is set """
 
-    admin, _, _, _, _, _, _ = get_accounts(web3)
+    admin = local_accounts[0].address
 
     env = contracts.get(ENV_CONTRACT_NAME)
     assert env is not None, "env contract missing"
@@ -25,10 +25,10 @@ def test_env_owner(web3, contracts):
     assert owner == admin, "Owner does not seem to be set properly."
 
 
-def test_env_uint(web3, contracts):
+def test_env_uint(web3, contracts, local_accounts):
     """ Test uint set/fetch """
 
-    admin, _, _, _, _, _, _ = get_accounts(web3)
+    admin = local_accounts[0].address
 
     env = contracts.get(ENV_CONTRACT_NAME)
 
@@ -49,10 +49,11 @@ def test_env_uint(web3, contracts):
     assert uintval == UINT_VAL_1, "value returned from contract does not match"
 
 
-def test_env_ban(web3, contracts):
+def test_env_ban(web3, contracts, local_accounts):
     """ Test ban setting """
 
-    admin, bidder, _, _, _, _, _ = get_accounts(web3)
+    admin = local_accounts[0].address
+    bidder, _, _, _, _, _ = get_remote_accounts(web3)
 
     env = contracts.get(ENV_CONTRACT_NAME)
 
@@ -89,10 +90,10 @@ def test_env_ban(web3, contracts):
     assert is_banned2 is False, "ban does not appear to have worked"
 
 
-def test_env_str(web3, contracts):
+def test_env_str(web3, contracts, local_accounts):
     """ Test string set/fetch """
 
-    admin, _, _, _, _, _, _ = get_accounts(web3)
+    admin = local_accounts[0].address
 
     env = contracts.get(ENV_CONTRACT_NAME)
 

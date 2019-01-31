@@ -5,7 +5,7 @@ from attrdict import AttrDict
 from hexbytes import HexBytes
 from web3 import Web3
 from web3.utils.events import get_event_data
-from .consts import DEPLOYER_ACCOUNT, STD_GAS, STD_GAS_PRICE
+from .consts import STD_GAS, STD_GAS_PRICE
 
 
 def std_tx(tx):
@@ -18,21 +18,13 @@ def std_tx(tx):
     return std
 
 
-def get_accounts(web3):
+def get_remote_accounts(web3, total=6):
     """
     Return 6 accounts
 
     admin, bidder, hoster, validator1, validator2, validator3, validator4 = get_accounts()
     """
-    return (
-        DEPLOYER_ACCOUNT,
-        web3.eth.accounts[0],
-        web3.eth.accounts[1],
-        web3.eth.accounts[2],
-        web3.eth.accounts[3],
-        web3.eth.accounts[4],
-        web3.eth.accounts[5],
-    )
+    return [web3.eth.accounts[i] for i in range(0, total)]
 
 
 def topic_signature(abi):

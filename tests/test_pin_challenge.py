@@ -3,7 +3,7 @@ import pytest
 from hexbytes import HexBytes
 from eth_utils import add_0x_prefix, remove_0x_prefix
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
     normalize_filehash,
     has_event,
@@ -26,8 +26,6 @@ from .consts import (
 
 def test_assemble_hash(web3, contracts):
     """ Test assembleHash """
-    owner, _, _, _, _, _, _ = get_accounts(web3)
-
     pinChallenge = contracts.get(PIN_CHALLENGE_CONTRACT_NAME)
     assert pinChallenge is not None, "Contract not found"
 
@@ -53,7 +51,7 @@ def test_challenge(web3, contracts):
     if web3.is_eth_tester:
         pytest.skip("eth_sign is not currently supported by eth_tester")
 
-    owner, bidder, pinner1, pinner2, _, _, _ = get_accounts(web3)
+    bidder, pinner1, pinner2, _, _, _ = get_remote_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     challenge = contracts.get(PIN_CHALLENGE_CONTRACT_NAME)
@@ -223,7 +221,7 @@ def test_mad(web3, contracts):
     if web3.is_eth_tester:
         pytest.skip("eth_sign is not currently supported by eth_tester")
 
-    owner, bidder, pinner1, pinner2, _, _, _ = get_accounts(web3)
+    bidder, pinner1, pinner2, _, _, _ = get_remote_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     challenge = contracts.get(PIN_CHALLENGE_CONTRACT_NAME)

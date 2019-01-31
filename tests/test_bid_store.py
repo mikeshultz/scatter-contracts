@@ -7,7 +7,7 @@ The general process for bid storage:
 1) ...
 """
 from .utils import (
-    get_accounts,
+    get_remote_accounts,
     std_tx,
     normalize_filehash,
 )
@@ -18,9 +18,10 @@ from .consts import (
 )
 
 
-def test_store_admin_funcs(web3, contracts):
+def test_store_admin_funcs(web3, contracts, local_accounts):
     """ Test a simple addBid """
-    admin, nobody, _, _, _, _, Scatter = get_accounts(web3)
+    admin = local_accounts[0].address
+    nobody, _, _, _, _, Scatter = get_remote_accounts(web3)
 
     bidStore = contracts.get(STORE_CONTRACT_NAME)
 
@@ -55,9 +56,10 @@ def test_store_admin_funcs(web3, contracts):
     assert bidStore.functions.getBidCount().call() == orig_bidCount
 
 
-def test_add_bid(web3, contracts):
+def test_add_bid(web3, contracts, local_accounts):
     """ Test a simple addBid """
-    admin, bidder, sAddress, _, _, _, _ = get_accounts(web3)
+    admin = local_accounts[0].address
+    bidder, sAddress, _, _, _, _ = get_remote_accounts(web3)
 
     bidStore = contracts.get(STORE_CONTRACT_NAME)
 
@@ -107,7 +109,7 @@ def test_add_bid(web3, contracts):
 
 def test_pinning(web3, contracts):
     """ test the pinning functionality """
-    admin, bidder, sAddress, _, _, otherHoster, hoster = get_accounts(web3)
+    bidder, sAddress, _, _, otherHoster, hoster = get_remote_accounts(web3)
 
     bidStore = contracts.get(STORE_CONTRACT_NAME)
 
