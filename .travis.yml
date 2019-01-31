@@ -2,7 +2,7 @@ language: python
 python: 
   - 3.6
 env:
-  - SCRIPT="sb -d test test -s"
+  - SCRIPT="sb -d test test"
 install:
   - pip install -r requirements.txt
   - pip install --no-deps --index-url https://test.pypi.org/simple/ "solidbyte==v0.7.6b1"
