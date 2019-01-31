@@ -43,6 +43,26 @@
     {
       "name": "UserStore",
       "networks": {}
+    },
+    {
+      "name": "SLib",
+      "networks": {}
+    },
+    {
+      "name": "ChallengeStore",
+      "networks": {}
+    },
+    {
+      "name": "DefenseStore",
+      "networks": {}
+    },
+    {
+      "name": "PinChallenge",
+      "networks": {}
+    },
+    {
+      "name": "PinStake",
+      "networks": {}
     }
   ],
   "seenAccounts": [
