@@ -6,7 +6,7 @@ env:
 install:
   - pip install -r requirements.txt
   - sb accounts create -p asdf1234
-  - echo "Account: $(sb accounts list 2> /dev/null | egrep -o '(0x[A-Fa-f0-9]+)')"
+  - 'echo "Account: $(sb accounts list 2> /dev/null | egrep -o \'(0x[A-Fa-f0-9]+)\')"'
   - sb accounts default -a $(sb accounts list 2> /dev/null | egrep -o '(0x[A-Fa-f0-9]+)')
 jobs:  
   include:
