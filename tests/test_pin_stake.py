@@ -1,22 +1,11 @@
 """ Tests for PinStake """
-from datetime import datetime
-from hexbytes import HexBytes
-from eth_utils import add_0x_prefix, remove_0x_prefix
 from .utils import (
     get_accounts,
     std_tx,
-    normalize_filehash,
-    has_event,
-    get_event,
 )
 from .consts import (
     MAIN_CONTRACT_NAME,
     PIN_STAKE_CONTRACT_NAME,
-    ZERO_ADDRESS,
-    FILE_HASH_1,
-    FILE_HASH_2,
-    FILE_SIZE_1,
-    DURATION_1,
 )
 
 

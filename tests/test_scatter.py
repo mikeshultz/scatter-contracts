@@ -28,8 +28,6 @@ from .consts import (
     FILE_SIZE_2,
     DURATION_2,
     ENV_CONTRACT_NAME,
-    ENV_ACCEPT_WAIT,
-    ENV_DEFAULT_MIN_VALIDATIONS,
     ENV_MIN_BID,
     ENV_MIN_DURATION,
 )

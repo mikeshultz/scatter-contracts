@@ -2,8 +2,6 @@
 from .utils import (
     get_accounts,
     std_tx,
-    has_event,
-    get_event,
 )
 from .consts import (
     ENV_CONTRACT_NAME,
@@ -12,6 +10,7 @@ from .consts import (
     STR_HASH_1,
     STR_VAL_1,
 )
+
 
 def test_env_owner(web3, contracts):
     """ Make sure owner is set """
@@ -48,6 +47,7 @@ def test_env_uint(web3, contracts):
     uintval = env.functions.getuint(UINT_HASH_1).call()
 
     assert uintval == UINT_VAL_1, "value returned from contract does not match"
+
 
 def test_env_ban(web3, contracts):
     """ Test ban setting """
@@ -86,7 +86,8 @@ def test_env_ban(web3, contracts):
 
     is_banned2 = env.functions.isBanned(bidder).call()
 
-    assert is_banned2 == False, "ban does not appear to have worked"
+    assert is_banned2 is False, "ban does not appear to have worked"
+
 
 def test_env_str(web3, contracts):
     """ Test string set/fetch """

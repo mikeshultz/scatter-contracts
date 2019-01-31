@@ -34,7 +34,5 @@ UINT_VAL_1 = 123
 STR_HASH_1 = Web3.sha3(text='imastring')
 STR_VAL_1 = 'imavalue'
 
-ENV_ACCEPT_WAIT = Web3.sha3(text='acceptHoldDuration')
-ENV_DEFAULT_MIN_VALIDATIONS = Web3.sha3(text='defaultMinValidations')
 ENV_MIN_DURATION = Web3.sha3(text='minDuration')
 ENV_MIN_BID = Web3.sha3(text='minBid')

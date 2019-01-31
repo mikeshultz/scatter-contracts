@@ -6,7 +6,6 @@ from .utils import (
 )
 from .consts import (
     CHALLENGE_STORE_CONTRACT_NAME,
-    ZERO_ADDRESS,
 )
 
 

@@ -1,6 +1,5 @@
 """ Tests for ChallengeStore """
 import pytest
-from datetime import datetime
 from hexbytes import HexBytes
 from eth_utils import add_0x_prefix, remove_0x_prefix
 from .utils import (
@@ -69,8 +68,12 @@ def test_challenge(web3, contracts):
     assert defenseStore.functions.isWriter(challenge.address).call(), "PinStake not writer"
 
     assert challenge.functions.pinStake().call() == pinStake.address, "pinStake not set."
-    assert challenge.functions.defenseStore().call() == defenseStore.address, "defenseStore not set."
-    assert challenge.functions.challengeStore().call() == challengeStore.address, "challengeStore not set."
+    assert challenge.functions.defenseStore().call() == defenseStore.address, (
+        "defenseStore not set."
+    )
+    assert challenge.functions.challengeStore().call() == challengeStore.address, (
+        "challengeStore not set."
+    )
     assert challenge.functions.bidStore().call() == bidStore.address, "bidStore not set."
 
     bidValue = web3.toWei(0.1, 'ether')
@@ -224,10 +227,7 @@ def test_mad(web3, contracts):
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
     challenge = contracts.get(PIN_CHALLENGE_CONTRACT_NAME)
-    challengeStore = contracts.get(CHALLENGE_STORE_CONTRACT_NAME)
     pinStake = contracts.get(PIN_STAKE_CONTRACT_NAME)
-    defenseStore = contracts.get(DEFENSE_STORE_CONTRACT_NAME)
-    bidStore = contracts.get(STORE_CONTRACT_NAME)
 
     bidValue = web3.toWei(0.1, 'ether')
 

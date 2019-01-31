@@ -1,4 +1,4 @@
 [flake8]
-exclude = .git,__pycache__,build
+exclude = .git,__pycache__,build,docs
 filename = *.py,*.vy
 max-line-length = 100

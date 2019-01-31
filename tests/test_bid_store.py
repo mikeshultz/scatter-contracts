@@ -2,32 +2,19 @@
 
 Overview
 --------
-The general process for bid storage: 
+The general process for bid storage:
 
 1) ...
 """
-from datetime import datetime
 from .utils import (
     get_accounts,
     std_tx,
-    has_event,
-    get_event,
-    event_topics,
     normalize_filehash,
 )
 from .consts import (
-    ZERO_ADDRESS,
-    MAIN_CONTRACT_NAME,
     STORE_CONTRACT_NAME,
-    ENV_CONTRACT_NAME,
     FILE_HASH_1,
     FILE_SIZE_1,
-    DURATION_1,
-    FILE_HASH_2,
-    FILE_SIZE_2,
-    DURATION_2,
-    ENV_ACCEPT_WAIT,
-    ENV_DEFAULT_MIN_VALIDATIONS,
 )
 
 

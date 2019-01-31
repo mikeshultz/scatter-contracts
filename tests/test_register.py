@@ -1,7 +1,5 @@
-from hexbytes import HexBytes
 from .utils import (
     get_accounts,
-    std_tx,
     normalize_filehash,
 )
 from .consts import (
