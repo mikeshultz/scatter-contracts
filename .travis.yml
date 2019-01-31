@@ -2,7 +2,7 @@ language: python
 python: 
   - 3.6
 env:
-  - SCRIPT="sb test test"
+  - SCRIPT="sb -d test test -s"
 install:
   - pip install -r requirements.txt
   - pip install --no-deps --index-url https://test.pypi.org/simple/ "solidbyte==v0.7.6b1"
@@ -11,6 +11,7 @@ install:
   - ls -lah ~/.ethereum/keystore
   - sb accounts list
   - sb accounts default -a $(sb accounts list 2> /dev/null | egrep -o '(0x[A-Fa-f0-9]+)')
+  - sb compile
 jobs:  
   include:
     - stage: "test-lint"
