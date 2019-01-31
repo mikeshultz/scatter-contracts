@@ -38,34 +38,34 @@ def test_store_admin_funcs(web3, contracts):
     bidStore = contracts.get(STORE_CONTRACT_NAME)
 
     # Set the Scatter address
-    txhash = bidStore.functions.setScatter(nobody).transact(std_tx({
+    txhash = bidStore.functions.grant(nobody).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
 
-    assert bidStore.functions.scatterAddress().call() == nobody
-    txhash = bidStore.functions.setScatter(Scatter).transact(std_tx({
+    assert bidStore.functions.isWriter(nobody).call()
+    txhash = bidStore.functions.grant(Scatter).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
-    assert bidStore.functions.scatterAddress().call() == Scatter
+    assert bidStore.functions.isWriter(Scatter).call()
 
     # Setting of bidCount
-    assert bidStore.functions.bidCount().call() == 0
-    txhash = bidStore.functions.setBidCount(1234).transact(std_tx({
+    orig_bidCount = bidStore.functions.getBidCount().call()
+    txhash = bidStore.functions.setNextBidID(1235).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
-    assert bidStore.functions.bidCount().call() == 1234
-    txhash = bidStore.functions.setBidCount(0).transact(std_tx({
+    assert bidStore.functions.getBidCount().call() == 1234
+    txhash = bidStore.functions.setNextBidID(orig_bidCount + 1).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
-    assert bidStore.functions.bidCount().call() == 0
+    assert bidStore.functions.getBidCount().call() == orig_bidCount
 
 
 def test_add_bid(web3, contracts):
@@ -73,17 +73,15 @@ def test_add_bid(web3, contracts):
     admin, bidder, sAddress, _, _, _, _ = get_accounts(web3)
 
     bidStore = contracts.get(STORE_CONTRACT_NAME)
-    scatter = contracts.get(MAIN_CONTRACT_NAME)
 
     # Set the Scatter address
-    txhash = bidStore.functions.setScatter(sAddress).transact(std_tx({
+    txhash = bidStore.functions.grant(sAddress).transact(std_tx({
             'from': admin,
         }))
     receipt = web3.eth.waitForTransactionReceipt(txhash)
     assert receipt.status == 1
 
-    # Verify no bids exist
-    assert not bidStore.functions.bidExists(0).call()
+    orig_bidCount = bidStore.functions.getBidCount().call()
 
     bidValue = int(1e17)
     requiredPinners = 2
@@ -105,17 +103,19 @@ def test_add_bid(web3, contracts):
     bid_receipt = web3.eth.waitForTransactionReceipt(bid_hash)
     assert bid_receipt.status == 1, "Bid TX failed"
 
+    bidID = orig_bidCount + 1
+
     # Veirfy tha tour new bid exists
-    assert bidStore.functions.bidExists(0).call()
-    assert bidStore.functions.bidCount().call() == 1
+    assert bidStore.functions.bidExists(bidID).call()
+    assert bidStore.functions.getBidCount().call() == orig_bidCount + 1
 
     # Verify all the getters
-    assert not bidStore.functions.isFullyPinned(0).call()
-    assert bidStore.functions.getPinnerCount(0).call() == 0
-    assert bidStore.functions.getBidder(0).call() == bidder
-    assert normalize_filehash(bidStore.functions.getFileHash(0).call()) == FILE_HASH_1
-    assert bidStore.functions.getFileSize(0).call() == FILE_SIZE_1
-    assert bidStore.functions.getBidAmount(0).call() == bidValue
+    assert not bidStore.functions.isFullyPinned(bidID).call()
+    assert bidStore.functions.getPinnerCount(bidID).call() == 0
+    assert bidStore.functions.getBidder(bidID).call() == bidder
+    assert normalize_filehash(bidStore.functions.getFileHash(bidID).call()) == FILE_HASH_1
+    assert bidStore.functions.getFileSize(bidID).call() == FILE_SIZE_1
+    assert bidStore.functions.getBidAmount(bidID).call() == bidValue
 
 
 def test_pinning(web3, contracts):
@@ -123,19 +123,16 @@ def test_pinning(web3, contracts):
     admin, bidder, sAddress, _, _, otherHoster, hoster = get_accounts(web3)
 
     bidStore = contracts.get(STORE_CONTRACT_NAME)
-    scatter = contracts.get(MAIN_CONTRACT_NAME)
 
     BID_GAS = int(1e6)
-    VALID_GAS = int(6e6)
 
     # Verify state is expected
-    assert bidStore.functions.scatterAddress().call() == sAddress
+    assert bidStore.functions.isWriter(sAddress).call()
 
     bidValue = int(1e17)
-    validationPool = int(1e17)
     requiredPinners = 2
     duration = 60*60
-    
+
     # Add a bid
     bid_hash = bidStore.functions.addBid(
         bidder,
@@ -151,7 +148,7 @@ def test_pinning(web3, contracts):
     bid_receipt = web3.eth.waitForTransactionReceipt(bid_hash)
     assert bid_receipt.status == 1, "Bid TX failed"
 
-    orig_count = bidStore.functions.bidCount().call()
+    orig_count = bidStore.functions.getBidCount().call()
     assert orig_count > 0
     bidId = orig_count - 1
     assert bidStore.functions.bidExists(bidId).call()
@@ -182,10 +179,3 @@ def test_pinning(web3, contracts):
     # Verify again
     # TODO: Should pinned still be a date?
     # assert bidStore.functions.getPinned(bidId).call() > int(datetime.now().timestamp()) - 60 * 5
-
-    # Set Scatter back so other tests don't fail
-    txhash = bidStore.functions.setScatter(scatter.address).transact(std_tx({
-            'from': admin
-        }))
-    receipt = web3.eth.waitForTransactionReceipt(txhash)
-    assert receipt.status == 1

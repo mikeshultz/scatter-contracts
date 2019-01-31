@@ -4,27 +4,31 @@ pragma solidity >0.4.0 <0.6.0;
 library Structures {
 
     struct Defense {
-        int bidID;
-        int challengeID;
-        int defenseID;
+        uint bidID;
+        uint challengeID;
+        uint defenseID;
+        uint8 nonce;
         uint when;
         address payable pinner;
-        bytes32 uniqueHash;
+        bytes16 halfHashA;
+        bytes16 halfHashB;
         uint8 v;
         bytes32 r;
         bytes32 s;
     }
     
     struct Challenge {
-        int bidID;
-        int challengeID;
+        uint bidID;
+        uint challengeID;
         uint when;
         address payable challenger;
-        int[] defenses;
+        bool defended;
+        uint[] defenses;
     }
     
     struct Stake {
-        int bidID;
+        uint bidID;
+        uint8 nonce;
         uint when;
         uint value;
         address payable staker;
@@ -32,14 +36,15 @@ library Structures {
 
     struct Bid {
         address payable bidder;
+        uint when;
         bytes32 fileHash;
-        int64 fileSize;
+        uint64 fileSize;
         uint bidAmount;
         uint duration;
-        int8 requiredPinners;
+        uint8 requiredPinners;
         bool paid;
         address payable[] pinners;
-        int[] challenges;
+        uint[] challenges;
     }
 
 }

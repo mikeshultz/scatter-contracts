@@ -48,7 +48,7 @@ def main(assertions, web3, contracts, deployer_account, network):
     # assert Structures is not None, "Unable to get Structures contract"
 
     # structures = Structures.deployed()
-    # assert rewards.address is not None, "Deploy of Structures failed.  No address found"
+    # assert slib.address is not None, "Deploy of Structures failed.  No address found"
 
     ##
     # SafeMath Library
@@ -67,28 +67,32 @@ def main(assertions, web3, contracts, deployer_account, network):
     env = Env.deployed()
     assert env.address is not None, "Deploy of Env failed.  No address found"
     if Env.new_deployment is True:
-        router.functions.set(web3.sha3(text='Env'), env.address).transact({
+        txhash = router.functions.set(web3.sha3(text='Env'), env.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
 
     ##
-    # Rewards Library
+    # SLib Library
     ##
-    Rewards = contracts.get('Rewards')
-    assert Rewards is not None, "Unable to get Rewards contract"
+    SLib = contracts.get('SLib')
+    assert SLib is not None, "Unable to get SLib contract"
 
-    rewards = Rewards.deployed(links={
+    slib = SLib.deployed(links={
             'SafeMath': safeMath.address,
         })
-    assert rewards.address is not None, "Deploy of Rewards failed.  No address found"
-    if Rewards.new_deployment is True:
-        router.functions.set(web3.sha3(text='Rewards'), rewards.address).transact({
+    assert slib.address is not None, "Deploy of SLib failed.  No address found"
+    if SLib.new_deployment is True:
+        txhash = router.functions.set(web3.sha3(text='SLib'), slib.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
 
     ##
     # BidStore - Primary storage contract
@@ -96,14 +100,50 @@ def main(assertions, web3, contracts, deployer_account, network):
     BidStore = contracts.get('BidStore')
     assert BidStore is not None, "Unable to get BidStore contract"
 
-    store = BidStore.deployed(router.address, gas=int(6e6))
+    store = BidStore.deployed(gas=int(6e6))
     assert store.address is not None, "Deploy of BidStore failed.  No address found"
     if BidStore.new_deployment is True:
-        router.functions.set(web3.sha3(text='BidStore'), store.address).transact({
+        txhash = router.functions.set(web3.sha3(text='BidStore'), store.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
+
+    ##
+    # ChallengeStore - Primary storage contract
+    ##
+    ChallengeStore = contracts.get('ChallengeStore')
+    assert ChallengeStore is not None, "Unable to get ChallengeStore contract"
+
+    cstore = ChallengeStore.deployed(gas=int(6e6))
+    assert cstore.address is not None, "Deploy of ChallengeStore failed.  No address found"
+    if ChallengeStore.new_deployment is True:
+        txhash = router.functions.set(web3.sha3(text='ChallengeStore'), cstore.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
+
+    ##
+    # DefenseStore - Primary storage contract
+    ##
+    DefenseStore = contracts.get('DefenseStore')
+    assert DefenseStore is not None, "Unable to get DefenseStore contract"
+
+    dstore = DefenseStore.deployed(gas=int(6e6))
+    assert dstore.address is not None, "Deploy of DefenseStore failed.  No address found"
+    if DefenseStore.new_deployment is True:
+        txhash = router.functions.set(web3.sha3(text='DefenseStore'), dstore.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
 
     ##
     # Scatter - Primary contract
@@ -111,40 +151,80 @@ def main(assertions, web3, contracts, deployer_account, network):
     Scatter = contracts.get('Scatter')
     assert Scatter is not None, "Unable to get Scatter contract"
 
-    sb = Scatter.deployed(router.address, links={
+    scatter = Scatter.deployed(router.address, links={
         'SafeMath': safeMath.address,
-        'Rewards': rewards.address
+        'SLib': slib.address
         })
-    assert sb.address is not None, "Deploy of Scatter failed.  No address found"
+    assert scatter.address is not None, "Deploy of Scatter failed.  No address found"
     if Scatter.new_deployment is True:
-        router.functions.set(web3.sha3(text='Scatter'), sb.address).transact({
+        txhash = router.functions.set(web3.sha3(text='Scatter'), scatter.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
-        store.functions.updateReferences().transact({
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
+
+        txhash = store.functions.grant(scatter.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "grant failed"
+
+        txhash = cstore.functions.grant(scatter.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "grant failed"
+
+        txhash = dstore.functions.grant(scatter.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "grant failed"
+
+    ##
+    # PinStake - Contrat handling staking storage
+    ##
+    PinStake = contracts.get('PinStake')
+    assert PinStake is not None, "Unable to get PinStake contract"
+
+    pinStake = PinStake.deployed(router.address)
+    assert pinStake.address is not None, "Deploy of PinStake failed.  No address found"
+
+    if PinStake.new_deployment is True:
+        txhash = router.functions.set(web3.sha3(text='PinStake'), pinStake.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
+
+        txhash = pinStake.functions.grant(scatter.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "grant failed"
 
     # updateReferences in Scatter only if BidStore is a new deployment and Scatter is not
-    if BidStore.new_deployment is True and not Scatter.new_deployment:
-        sb.functions.updateReferences().transact({
+    if (PinStake.new_deployment is True or BidStore.new_deployment is True) \
+            and not Scatter.new_deployment:
+        txhash = scatter.functions.updateReferences().transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
-
-    store_sb_address = store.functions.scatterAddress().call()
-    if store_sb_address != sb.address:
-        set_hash = store.functions.setScatter(sb.address).transact({
-            'from': deployer_account,
-            'gas': int(1e5),
-            'gasPrice': GAS_PRICE,
-            })
-        set_receipt = web3.eth.waitForTransactionReceipt(set_hash)
-        assert set_receipt.status == 1
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "updateReferences failed"
 
     ##
     # UserStore - UserStore storage for user registrations
@@ -156,11 +236,13 @@ def main(assertions, web3, contracts, deployer_account, network):
     assert userStore.address is not None, "Deploy of UserStore failed.  No address found"
 
     if UserStore.new_deployment is True:
-        router.functions.set(web3.sha3(text='UserStore'), userStore.address).transact({
+        txhash = router.functions.set(web3.sha3(text='UserStore'), userStore.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
 
     ##
     # Register - Contrat handling user registrations
@@ -172,17 +254,65 @@ def main(assertions, web3, contracts, deployer_account, network):
     assert register.address is not None, "Deploy of Register failed.  No address found"
 
     if Register.new_deployment is True:
-        router.functions.set(web3.sha3(text='Register'), register.address).transact({
+        txhash = router.functions.set(web3.sha3(text='Register'), register.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
         })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
 
     if Register.new_deployment is True or UserStore.new_deployment is True:
-        userStore.functions.setWriter(register.address).transact({
+        txhash = userStore.functions.setWriter(register.address).transact({
             'from': deployer_account,
             'gas': int(1e5),
             'gasPrice': GAS_PRICE,
             })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "setWriter failed"
 
-    return True
+    ##
+    # PinChallenge - Contrat handling user registrations
+    ##
+    PinChallenge = contracts.get('PinChallenge')
+    assert PinChallenge is not None, "Unable to get PinChallenge contract"
+
+    pinChallenge = PinChallenge.deployed(router.address)
+    assert pinChallenge.address is not None, "Deploy of PinChallenge failed.  No address found"
+
+    if PinChallenge.new_deployment is True:
+        txhash = router.functions.set(
+            web3.sha3(text='PinChallenge'),
+            pinChallenge.address
+        ).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"
+
+        txhash = cstore.functions.grant(pinChallenge.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "grant failed"
+
+        txhash = dstore.functions.grant(pinChallenge.address).transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+        })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "grant failed"
+
+    if PinChallenge.new_deployment is True or Scatter.new_deployment is True:
+        txhash = scatter.functions.updateReferences().transact({
+            'from': deployer_account,
+            'gas': int(1e5),
+            'gasPrice': GAS_PRICE,
+            })
+        receipt = web3.eth.waitForTransactionReceipt(txhash)
+        assert receipt.status == 1, "router set failed"

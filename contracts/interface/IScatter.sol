@@ -1,76 +1,35 @@
 pragma solidity >=0.4.0 <0.6.0;
 
+
 interface IScatter {
 
-    /* Are structs useful in interface?
-    struct Validation {
-        int32 bidId;
-        int32 when;
-        address verifier;
-        bool isValid;
-    }
-
-    struct Bid {
-        address bidder;
-        bytes32 fileHash;
-        int32 fileSize;
-        uint32 bidAmount;
-        uint32 validationPool;
-        int32 duration;
-        int32 accepted;
-        address hoster;
-        int32 pinned;
-        bool paid;
-        int32 minValidations;
-        Validation[] validations;
-    }*/
-
     event BidSuccessful(
-        int indexed bidId,
+        uint indexed bidID,
         address indexed bidder,
         uint indexed bidValue,
-        uint validationPool,
         bytes32 fileHash,
-        int64 fileSize
+        uint64 fileSize
     );
+
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
-    event Accepted(int indexed bidId, uint indexed when, address indexed hoster);
-    event AcceptWait(int waitLeft);
-    event Pinned(int indexed bidId, address indexed hoster, bytes32 fileHash);
-    event NotAcceptedByPinner(int indexed bidId, address indexed hoster);
-    event ValidationOcurred(int indexed bidId, address indexed validator, bool indexed isValid);
+    event FilePinned(uint indexed bidID, address indexed pinner, bytes32 fileHash);
+    event NotOpenToPin(uint indexed bidID, address indexed pinner);
+    event WithdrawFailed(address indexed sender, string reason);
+    event WithdrawFunds(uint indexed value, address indexed payee);
 
-    function getBid(int bidId) external view returns (
-        address,
-        bytes32,
-        int,
-        uint,
-        uint,
-        uint,
-        int16
-    );
-    function getJob() external view returns (int, bytes32, int);
-    function getBidCount() external view returns (int);
-    function getHoster(int bidId) external view returns (address);
-    function getValidation(int bidId, int idx) external view returns (uint, address, bool, bool);
-    function getValidationCount(int bidId) external view returns (uint);
-
-    function isBidOpenForAccept(int bidId) external view returns (bool);
-    function isBidOpenForPin(int bidId) external view returns (bool);
-    function validationSway(int bidId) external view returns (uint);
-    function satisfied(int bidId) external view returns (bool);
-
-    function balance(address _address) external view returns (uint);
-    function balance() external view returns (uint);
+    event NotStaker(uint indexed bidID, address indexed sender);
+    event PinStake(uint indexed bidID, address indexed pinner);
+    event PinStakeInvalid(uint indexed bidID, address indexed staker);
+    event AlreadyStaked(uint indexed bidID, address indexed sender);
 
     function bid(
         bytes32 fileHash,
-        int fileSize,
-        int durationSeconds,
+        uint fileSize,
+        uint durationSeconds,
         uint bidValue,
         uint validationPool,
-        int minValidations
+        uint minValidations
     )
     external
     payable
@@ -78,8 +37,8 @@ interface IScatter {
 
     function bid(
         bytes32 fileHash,
-        int fileSize,
-        int duration,
+        uint fileSize,
+        uint duration,
         uint bidValue,
         uint validationPool
     )
@@ -87,11 +46,41 @@ interface IScatter {
     payable
     returns (bool);
 
-    function accept(int bidId) external returns (bool);
-    function pinned(int bidId) external returns (bool);
-    function validate(int bidId) external;
-    function invalidate(int bidId) external;
+    function stake(uint bidId) external payable returns (bool);
+    function pinned(uint bidId) external returns (bool);
+    function challenge() external returns (bool);
+    function defend() external returns (bool);
     function transfer(address payable _dest) external;
     function withdraw() external;
+
+    /** burnStakes(uint)
+     *  @notice Burn all stakes for a challenge
+     *  @param challengeID  The Challenge ID
+     *  @return bull        Success?
+     */
+    function burnStakes(uint challengeID) external returns (bool);
+
+    function getBid(uint bidId) external view returns (
+        address,
+        bytes32,
+        uint,
+        uint,
+        uint,
+        uint,
+        uint16
+    );
+    function getJob() external view returns (uint, bytes32, uint);
+    function getBidCount() external view returns (uint);
+    function getHoster(uint bidId) external view returns (address);
+    function getValidation(uint bidId, uint idx) external view returns (uint, address, bool, bool);
+    function getValidationCount(uint bidId) external view returns (uint);
+
+    function isBidOpenForAccept(uint bidId) external view returns (bool);
+    function isBidOpenForPin(uint bidId) external view returns (bool);
+    function validationSway(uint bidId) external view returns (uint);
+    function satisfied(uint bidId) external view returns (bool);
+
+    function balance(address _address) external view returns (uint);
+    function balance() external view returns (uint);
 
 }

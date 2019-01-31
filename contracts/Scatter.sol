@@ -2,14 +2,18 @@ pragma solidity >=0.5.2 <0.6.0;
 
 import "./interface/IRouter.sol";
 import "./interface/IScatter.sol";
+import "./interface/IPinStake.sol";
+import "./interface/IPinChallenge.sol";
+import "./interface/IBidStore.sol";
+import "./interface/IChallengeStore.sol";
+import "./interface/IDefenseStore.sol";
 
 import "./lib/Owned.sol";
 import "./lib/SafeMath.sol";
 import "./lib/Structures.sol";
-import "./lib/Rewards.sol";
+import "./lib/SLib.sol";
 
 import "./storage/Env.sol";
-import "./storage/BidStore.sol";
 
 
 /* Scatter
@@ -19,50 +23,60 @@ import "./storage/BidStore.sol";
 General steps of use
 --------------------
 - user bids for hosting (bid())
-- hoster accepts, pins the file on their node, then.. (accept())
-- hoster marks it as 'pinned' (pinned())
-- validators verify that it is indeed pinned on the node (validate()/invalidate())
-- the first validator after duration triggers payouts for everyone
+- pinner stakes
+- pinner marks it as 'pinned' (pinned())
+- TODO: more
 */
 contract Scatter is Owned {  /// interface: IScatter
     using SafeMath for uint;
 
     event BidSuccessful(
-        int indexed bidId,
+        uint indexed bidID,
         address indexed bidder,
         uint indexed bidValue,
-        uint validationPool,
         bytes32 fileHash,
-        int64 fileSize
+        uint64 fileSize
     );
 
     event BidInvalid(bytes32 indexed fileHash, string reason);
     event BidTooLow(bytes32 indexed fileHash);
-    event Accepted(int indexed bidId, uint indexed when, address indexed hoster);
-    event AcceptWait(uint waitLeft);
-    event Pinned(int indexed bidId, address indexed hoster, bytes32 fileHash);
-    event NotAcceptedByPinner(int indexed bidId, address indexed hoster);
+    event FilePinned(uint indexed bidID, address indexed pinner, bytes32 fileHash);
+    event NotOpenToPin(uint indexed bidID, address indexed pinner);
     event WithdrawFailed(address indexed sender, string reason);
-    event Withdraw(uint indexed value, address indexed hoster);
-    event ValidationOcurred(int indexed bidId, address indexed validator, bool indexed isValid);
+    event WithdrawFunds(uint indexed value, address indexed payee);
+
+    event NotStaker(uint indexed bidID, address indexed sender);
+    event PinStake(uint indexed bidID, address indexed pinner);
+    event PinStakeInvalid(uint indexed bidID, address indexed staker);
+    event AlreadyStaked(uint indexed bidID, address indexed sender);
 
     Env public env;
     IBidStore public bidStore;
+    IChallengeStore public challengeStore;
+    IPinChallenge public pinChallenge;
+    IDefenseStore public defenseStore;
+    IPinStake public pinStake;
     IRouter public router;
 
     mapping(address => uint) private balanceSheet;
-    uint public remainderFunds;
+    uint public balanceSheetTotal;
+    uint public stakeBalance;
+    uint public remainderFunds;  // What TODO with this?
 
     // solhint-disable-next-line max-line-length
     bytes32 private constant EMPTY_IPFS_FILE = 0xbfccda787baba32b59c78450ac3d20b633360b43992c77289f9ed46d843561e6;
-    bytes32 private constant ENV_ACCEPT_HOLD_DURATION = keccak256("acceptHoldDuration");
-    bytes32 private constant ENV_DEFAULT_MIN_VALIDATIONS = keccak256("defaultMinValidations");
+    bytes32 private constant ENV_REQUIRED_PINNERS = keccak256("requiredPinners");
     bytes32 private constant ENV_MIN_DURATION = keccak256("minDuration");
     bytes32 private constant ENV_MIN_BID = keccak256("minBid");
     bytes32 private constant ENV_HASH = keccak256("Env");
     bytes32 private constant BID_STORE_HASH = keccak256("BidStore");
+    bytes32 private constant CHALLENGE_STORE_HASH = keccak256("ChallengeStore");
+    bytes32 private constant DEFENSE_STORE_HASH = keccak256("DefenseStore");
+    bytes32 private constant PIN_STAKE_HASH = keccak256("PinStake");
+    bytes32 private constant PIN_CHALLENGE_HASH = keccak256("PinChallenge");
 
     modifier notBanned() { require(!env.isBanned(msg.sender), "banned"); _; }
+    modifier pinChallengeOnly() { require(msg.sender == address(pinChallenge), "PC only"); _; }
 
     /** constructor(address, address)
      *  @dev initialize the contract
@@ -74,213 +88,140 @@ contract Scatter is Owned {  /// interface: IScatter
         updateReferences();
     }
 
-    /** satisfied(int)
+    /** satisfied(uint)
      *  @notice Has the bid completed it's full lifecycle successfully?
-     *  @param  bidId   The bid ID
+     *  @param  bidID   The bid ID
      *  @return bool If the lifecycle is complete and all requirements are satisfied
      */
-    function satisfied(int bidId) external view returns (bool)
+    function satisfied(uint bidID) external view returns (bool)
     {
-        uint total = bidStore.getValidationCount(bidId);
-        uint minValid = uint(bidStore.getMinValidations(bidId));
-        if (total < minValid)
+        uint challengeCount = bidStore.getChallengeCount(bidID);
+        if (challengeCount > 0)
         {
-            return false;
+            uint latestChallengeID = bidStore.getChallengeID(bidID, challengeCount);
+            // If an open challenge hasn't been defended, not satisfied
+            if (!challengeStore.getDefended(latestChallengeID))
+            {
+                return false;
+            }
         }
-
-        uint sway = validationSway(bidId);
-
-        if (sway == 0) // No ties
-        {
-            return false;
-        }
-
-        // Must be a simple majority of minValidations or better
-        return(sway >= minValid);
+        return(uint8(bidStore.getPinnerCount(bidID)) >= bidStore.getRequiredPinners(bidID));
     }
 
-    /** getBid(int)
+    function hashBytes32(bytes32 toHash) external pure returns (bytes32)
+    {
+        return SLib.hashBytes32(toHash);
+    }
+
+    function verifySignature(address signer, bytes32 hash, uint8 v, bytes32 r,
+        bytes32 s)
+    external pure returns (bool)
+    {
+        return SLib.verifySignature(signer, hash, v, r, s);
+    }
+
+    /** audit()
+     *  @notice Do a simplistic audit of internal funds tracking
+     *  @return bool  Do the numbers line up?
+     */
+    function audit() external view returns (bool)
+    {
+        uint contractBalance = address(this).balance;
+        return (balanceSheetTotal + remainderFunds == contractBalance);
+    }
+
+    /** getBid(uint)
      *  @notice Get the main attributes of a bid
-     *  @param  bidId   The bid ID
+     *  @param  bidID   The bid ID
      *  @return address The bidder's address
      *  @return bytes32 The IFPS hash of the file
-     *  @return int     The size of the file in bytes
+     *  @return uint     The size of the file in bytes
      *  @return uint    The amount of the bid
-     *  @return uint    The amount provided to fund validators
      *  @return uint    The duration of the pinning
-     *  @return int16   The minimum amount of validators that need to validate the bid
+     *  @return uint8    The amount of required pinners
      */
-    function getBid(int bidId) external view returns (
+    function getBid(uint bidID) external view returns (
         address,
         bytes32,
-        int,
         uint,
         uint,
         uint,
-        int16
+        uint8
     )
     {
-        return bidStore.getBid(bidId);
+        return bidStore.getBid(bidID);
     }
 
-    /** getJob()
-     *  @notice Return a bid that needs to be services
-     *  @return int     The bid ID
-     *  @return bytes32 The IFPS hash of the file
-     *  @return int64   The size of the file in bytes
-     */
-    function getJob() external view returns (int, bytes32, int64)
-    {
-        // TODO: Look into a queue library, maybe?
-        // TODO: Test this with thousands(or more) bids
-        int totalBids = bidStore.getBidCount();
-        for (int i = 0; i < totalBids; i++)
-        {
-            if (isBidOpenForAccept(i))
-            {
-                bytes32 fileHash = bidStore.getFileHash(i);
-                int64 fileSize = bidStore.getFileSize(i);
-                return (i, fileHash, fileSize);
-            }
-        }
-        return (-1, 0, 0);
-    }
-
-    /** isBidOpenForPin(int, address)
+    /** isBidOpenForPin(uint, address)
      *  @notice Check if a file for a bid can be pinned by an address
-     *  @param  bidId   The bid ID
-     *  @param _hoster  The hoster that would like to pin the file
+     *  @param  bidID   The bid ID
+     *  @param _pinner  The pinner that would like to pin the file
      *  @return bool If the file can be pinned
      */
-    function isBidOpenForPin(int bidId, address _hoster) public view
+    function isBidOpenForPin(uint bidID, address payable _pinner) public view
     returns (bool)
     {
-        uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
-        bytes32 fileHash = bidStore.getFileHash(bidId);
-        uint accepted = bidStore.getAccepted(bidId);
-        address hoster = bidStore.getHoster(bidId);
+        bytes32 fileHash = bidStore.getFileHash(bidID);
+        uint valueStaked = pinStake.getStakeValue(bidID, _pinner);
+        uint bidAmount = bidStore.getBidAmount(bidID);
 
         return (
             fileHash != bytes32(0)
-            && !bidStore.isPinned(bidId)
-            && (
-                accepted == 0
-                || now - uint(accepted) >= acceptWait
-                || (
-                    now - uint(accepted) < acceptWait
-                    && hoster == _hoster
-                )
-            )
+            && valueStaked >= bidAmount.div(2)
         );
     }
 
-    /** isBidOpenForPin(int)
+    /** isBidOpenForPin(uint)
      *  @notice Check if a file for a bid can be pinned by the sender
-     *  @param  bidId   The bid ID
+     *  @param  bidID   The bid ID
      *  @return bool If the file can be pinned
      */
-    function isBidOpenForPin(int bidId) public view
+    function isBidOpenForPin(uint bidID) public view
     returns (bool)
     {
-        return isBidOpenForPin(bidId, msg.sender);
+        return isBidOpenForPin(bidID, msg.sender);
     }
 
-    /** isBidOpenForAccept(int, address)
-     *  @notice Check if a file for a bid can be accepted by an address
-     *  @param  bidId   The bid ID
-     *  @param _hoster  The hoster that would like to accept the file
-     *  @return bool If the file can be accepted
+    /** isBidOpenForStake(uint, address)
+     *  @notice Check if a file for a bid can be staked by an address
+     *  @param  bidID   The bid ID
+     *  @param _pinner  The potential staker
+     *  @return bool If the file can be staked
      */
-    function isBidOpenForAccept(int bidId, address _hoster) public view
+    function isBidOpenForStake(uint bidID, address _pinner) public view
     returns (bool)
     {
-        uint acceptWait = env.getuint(ENV_ACCEPT_HOLD_DURATION);
-        bytes32 fileHash = bidStore.getFileHash(bidId);
-        uint accepted = bidStore.getAccepted(bidId);
-        address bidder = bidStore.getBidder(bidId);
+        bytes32 fileHash = bidStore.getFileHash(bidID);
+        uint8 requiredPinners = bidStore.getRequiredPinners(bidID);
+        uint stakeCount = pinStake.getStakeCount(bidID);
+        address bidder = bidStore.getBidder(bidID);
         return (
             fileHash != bytes32(0)
-            && !bidStore.isPinned(bidId)
-            && (accepted == 0 || now - uint(accepted) >= acceptWait)
-            && bidder != _hoster
+            && !bidStore.isFullyPinned(bidID)
+            && uint8(stakeCount) < requiredPinners
+            && bidder != _pinner
         );
     }
 
-    /** isBidOpenForAccept(int)
+    /** isBidOpenForStake(uint)
      *  @notice Check if a file for a bid can be accepted by the sender
-     *  @param  bidId   The bid ID
+     *  @param  bidID   The bid ID
      *  @return bool If the file can be accepted
      */
-    function isBidOpenForAccept(int bidId) public view
+    function isBidOpenForStake(uint bidID) public view
     returns (bool)
     {
-        return isBidOpenForAccept(bidId, msg.sender);
-    }
-
-    /** validationSway(int)
-     *  @notice Calculate the sway in either direction of validations
-     *  @param  bidId   The bid ID
-     *  @return uint    The sway, negative or positive
-     */
-    function validationSway(int bidId) public view returns (uint)
-    {
-        uint total = bidStore.getValidationCount(bidId);
-        uint sway = 0;
-        for (uint i = 0; i < total; i++)
-        {
-            if (bidStore.getValidationIsValid(bidId, i))
-            {
-                sway += 1;
-            }
-            else
-            {
-                sway -= 1;
-            }
-        }
-        return sway;
+        return isBidOpenForStake(bidID, msg.sender);
     }
 
     /** getBidCount()
      *  @notice Return the total amount of bids
-     *  @return int     The total of known bids
+     *  @return uint     The total of known bids
      */
     function getBidCount()
-    public view returns (int)
-    {
-        return bidStore.getBidCount();
-    }
-
-    /** getValidation(int, uint)
-     *  @notice Get a specific Validation from a bid
-     *  @return uint    The timestamp the validation occurred
-     *  @return address The validator's address
-     *  @return bool    If the validator deamed the pin valid
-     *  @return bool    If the validator has been paid
-     */
-    function getValidation(int bidId, uint idx) public view
-    returns (uint, address, bool, bool)
-    {
-        return bidStore.getValidation(bidId, idx);
-    }
-
-    /** getValidationCount(int)
-     *  @notice Get the total Validations for a bid
-     *  @return uint    The total validations for the provided bid ID
-     */
-    function getValidationCount(int bidId)
     public view returns (uint)
     {
-        return bidStore.getValidationCount(bidId);
-    }
-
-    /** getHoster(int)
-     *  @notice Get the hoster address set for a bid
-     *  @return address The hoster's address
-     */
-    function getHoster(int bidId)
-    public view returns (address)
-    {
-        return bidStore.getHoster(bidId);
+        return bidStore.getBidCount();
     }
 
     /** balance(address)
@@ -302,48 +243,45 @@ contract Scatter is Owned {  /// interface: IScatter
         return balanceSheet[msg.sender];
     }
 
-    /** bid(bytes32, int64, uint, uint, uint, int16)
+    /** bid(bytes32, uint64, uint, uint, uint, uint16)
      *  @notice Make a bid
      *  @dev This is the mack daddy of functions that kicks off the entire process.  It will
      *      validate, store the bid, and send out an event.
      *  @param fileHash         The IPFS file hash to be pinned
      *  @param fileSize         The size of the file in bytes
      *  @param durationSeconds  The requested duration of the IPFS pin
-     *  @param bidValue         The value provided to compensate the hoster
-     *  @param validationPool   The value to be split between validators
-     *  @param minValidations   The minimum amount of majority validations
+     *  @param bidValue         The value provided to compensate the pinners
+     *  @param requiredPinners  The amount of pinners the bid requires
      *  @return bool    Succeeded?
      */
     function bid(
         bytes32 fileHash,
-        int64 fileSize,
+        uint64 fileSize,
         uint durationSeconds,
         uint bidValue,
-        uint validationPool,
-        int16 minValidations
+        uint8 requiredPinners
     )
     public notBanned
     payable
     returns (bool)
     {
 
-        if (!validateBid(fileHash, fileSize, durationSeconds, bidValue, validationPool,
-            minValidations))
+        if (!validateBid(fileHash, fileSize, durationSeconds, bidValue))
         {
             emit BidInvalid(fileHash, "failed validation");
             return false;
         }
 
-        int bidId = bidStore.addBid(msg.sender, fileHash, fileSize, bidValue, validationPool,
-                                    minValidations, durationSeconds);
+        uint bidID = bidStore.addBid(msg.sender, fileHash, fileSize, bidValue, durationSeconds,
+            requiredPinners);
 
-        assert(bidId > -1);
+        // For internal accounting
+        balanceSheetTotal += msg.value;
 
         emit BidSuccessful(
-            bidId,
+            bidID,
             address(msg.sender),
             bidValue,
-            validationPool,
             fileHash,
             fileSize
         );
@@ -351,114 +289,106 @@ contract Scatter is Owned {  /// interface: IScatter
         return true;
     }
 
-    /** bid(bytes32, int64, uint, uint, uint)
+    /** bid(bytes32, uint64, uint, uint, uint)
      *  @notice Make a bid
-     *  @dev This is an alias for the other bid function if only the default minValidation is to be
-     *      used for this bid.
+     *  @dev This is an alias for the other bid function if only the default requiredPinners is to
+     *      be used for this bid.
      *  @param fileHash         The IPFS file hash to be pinned
      *  @param fileSize         The size of the file in bytes
      *  @param durationSeconds  The requested duration of the IPFS pin
-     *  @param bidValue         The value provided to compensate the hoster
-     *  @param validationPool   The value to be split between validators
+     *  @param bidValue         The value provided to compensate the pinners
      *  @return bool    Succeeded?
      */
     function bid(
         bytes32 fileHash,
-        int64 fileSize,
+        uint64 fileSize,
         uint durationSeconds,
-        uint bidValue,
-        uint validationPool
+        uint bidValue
     )
     public
     payable
     returns (bool)
     {
-        // Use the minimum validations default from the Env contract
-        uint minValid = env.getuint(ENV_DEFAULT_MIN_VALIDATIONS);
-        return bid(fileHash, fileSize, durationSeconds, bidValue, validationPool, int16(minValid));
+        // Use the minimum pinners default from the Env contract
+        uint requiredPinners = env.getuint(ENV_REQUIRED_PINNERS);
+        return bid(fileHash, fileSize, durationSeconds, bidValue, uint8(requiredPinners));
     }
 
-    /** accept(int)
-     *  @notice For a hoster to optionally signal their intention to pin a file. This sets a short
-     *      term reservation in place.
-     *  @param bidId    The ID of the bid to accept
+    /** stake(bidID)
+     *  @notice Add a stake to show your intention to pin a file for a bid
+     *  @param bidID    The ID of the bid to accept
      *  @return bool    Succeeded?
      */
-    function accept(int bidId) public notBanned
+    function stake(uint bidID) public notBanned payable
     returns (bool)
     {
+        require(msg.value > 0, "no value");
 
-        if (!isBidOpenForAccept(bidId))
+        if (!isBidOpenForStake(bidID))
         {
-            uint accepted = bidStore.getAccepted(bidId);
-            emit AcceptWait(now - accepted);
+            emit PinStakeInvalid(bidID, msg.sender);
             return false;
         }
 
-        require(bidStore.setAcceptNow(bidId, msg.sender), "accept error");
+        if (!bidStore.bidExists(bidID))
+        {
+            emit PinStakeInvalid(bidID, msg.sender);
+            return false;
+        }
 
-        emit Accepted(bidId, now, msg.sender);
+        uint valueStaked = pinStake.getStakeValue(bidID, msg.sender);
+        uint bidAmount = bidStore.getBidAmount(bidID);
+        uint requiredPinners = env.getuint(ENV_REQUIRED_PINNERS);
+        if (valueStaked >= bidAmount.div(requiredPinners))
+        {
+            emit AlreadyStaked(bidID, msg.sender);
+            return false;
+        }
 
-        return true;
+        // If they havent staked, add the stake
+        if (valueStaked < 1)
+        {
+            require(pinStake.addStake(bidID, msg.value, msg.sender), "failed");
+        }
+        // Otherwise, add this new vlaue
+        else
+        {
+            require(pinStake.addStakeValue(bidID, msg.value, msg.sender), "value add failed");
+        }
+
+        stakeBalance += msg.value; // Internal accounting
+
+        emit PinStake(bidID, msg.sender);
     }
 
-    /** pinned(int)
+    /** pinned(uint)
      *  @notice For a hoster to notify everyone that the pin is in place
-     *  @param bidId    The ID of the bid to accept
+     *  @param bidID    The ID of the bid to accept
      *  @return bool    Succeeded?
      */
-    function pinned(int bidId) public notBanned
+    function pinned(uint bidID) public notBanned
     returns (bool)
     {
-        require(!bidStore.isPinned(bidId), "already pinned");
+        require(!bidStore.isFullyPinned(bidID), "already pinned");
 
-        if (!isBidOpenForPin(bidId))
+        if (!isBidOpenForPin(bidID))
         {
-            address storedHoster = bidStore.getHoster(bidId);
-            emit NotAcceptedByPinner(bidId, storedHoster);
+            emit NotOpenToPin(bidID, msg.sender);
             return false;
         }
 
-        require(bidStore.setPinned(bidId, msg.sender), "accept error");
+        require(bidStore.addPinner(bidID, msg.sender), "failed");
 
-        bytes32 fileHash = bidStore.getFileHash(bidId);
-        emit Pinned(bidId, msg.sender, fileHash);
+        // If this is the final pinner, create the initial challenge
+        if (bidStore.getPinnerCount(bidID) == bidStore.getRequiredPinners(bidID))
+        {
+            require(pinChallenge.challenge(bidID) > 0, "challenge failed");
+        }
+
+        bytes32 fileHash = bidStore.getFileHash(bidID);
+        emit FilePinned(bidID, msg.sender, fileHash);
 
         return true;
-    }
-
-    /** validate(int)
-     *  @notice For a validator to mark a pin for a bid as valid
-     *  @param bidId    The ID of the bid to be validated
-     */
-    function validate(int bidId)
-    public notBanned
-    {
-        addValidation(bidId, true);
-    }
-
-    /** invalidate(int)
-     *  @notice For a validator to mark a pin for a bid as invalid
-     *  @param bidId    The ID of the bid to be validated
-     */
-    function invalidate(int bidId)
-    public notBanned
-    {
-        addValidation(bidId, false);
-    }
-
-    /** validatorIndex(int, address payable)
-     *  @notice Get the index in the array of a Validation that has a specific address set as
-     *      validator
-     *  @param bidId        The ID of the bid to be validated
-     *  @param validator    The address to look for
-     *  @return uint        The array index of the Validation
-     */
-    function validatorIndex(int bidId, address payable validator) public view returns (uint)
-    {
-
-        return bidStore.getValidatorIndex(bidId, validator);
-
     }
 
     /** transfer(address payable)
@@ -480,8 +410,9 @@ contract Scatter is Owned {  /// interface: IScatter
         // Reset and transfer
         balanceSheet[msg.sender] = 0;
         _dest.transfer(senderBalance);
+        balanceSheetTotal -= senderBalance;
 
-        emit Withdraw(senderBalance, msg.sender);
+        emit WithdrawFunds(senderBalance, msg.sender);
     }
 
     /** withdraw()
@@ -490,6 +421,38 @@ contract Scatter is Owned {  /// interface: IScatter
     function withdraw() public notBanned
     {
         transfer(msg.sender);
+    }
+
+    /** burnStakes(uint)
+     *  @notice Burn all stakes for a challenge
+     *  @param challengeID  The Challenge ID
+     *  @return bull        Success?
+     */
+    function burnStakes(uint challengeID) public pinChallengeOnly returns (bool)
+    {
+        uint burnedEther = 0;
+
+        uint bidID = challengeStore.getBidID(challengeID);
+
+        for (uint i = 0; i < challengeStore.getDefenseCount(challengeID); i++)
+        {
+            uint defenseID = challengeStore.getDefenseID(challengeID, i);
+            address payable pinner = defenseStore.getPinner(defenseID);
+            burnedEther += pinStake.getStakeValue(bidID, pinner);
+        }
+
+        require(pinStake.burnStakes(bidID), "burn failed");
+        
+        if (burnedEther < 1)
+        {
+            return false;
+        }
+
+        // For internal accounting
+        stakeBalance -= burnedEther;
+        remainderFunds += burnedEther;
+
+        return true;
     }
 
     /** updateReferences()
@@ -513,50 +476,54 @@ contract Scatter is Owned {  /// interface: IScatter
             bidStore = IBidStore(newBSAddress);
             updated = true;
         }
+
+        address newCSAddress = router.get(CHALLENGE_STORE_HASH);
+        if (newCSAddress != address(challengeStore))
+        {
+            challengeStore = IChallengeStore(newCSAddress);
+            updated = true;
+        }
+
+        address newDSAddress = router.get(DEFENSE_STORE_HASH);
+        if (newDSAddress != address(defenseStore))
+        {
+            defenseStore = IDefenseStore(newDSAddress);
+            updated = true;
+        }
+
+        address newPSAddress = router.get(PIN_STAKE_HASH);
+        if (newPSAddress != address(pinStake))
+        {
+            pinStake = IPinStake(newPSAddress);
+            updated = true;
+        }
+
+        address newPCAddress = router.get(PIN_CHALLENGE_HASH);
+        if (newPCAddress != address(pinChallenge))
+        {
+            pinChallenge = IPinChallenge(newPCAddress);
+            updated = true;
+        }
         return updated;
     }
 
-    /** payout(int)
-     *  @dev Mark the balance sheet with the appropriate funds for a specific bid
-     *  @param bidId        The ID of the bid to be validated
-     */
-    function payout(int bidId)
+    /*TODO
+    function payout(int bidID)
     internal
     {
-        uint validationPool = bidStore.getValidationPool(bidId);
+        uint validationPool = bidStore.getValidationPool(bidID);
 
         // Payout
-        require(bidStore.getValidationCount(bidId) > 0, "non validators");
-        uint amountPaid = Rewards.payValidators(address(bidStore), bidId, balanceSheet);
+        require(bidStore.getValidationCount(bidID) > 0, "non validators");
+        uint amountPaid = Rewards.payValidators(address(bidStore), bidID, balanceSheet);
 
         uint remainder = validationPool - amountPaid;
         if (remainder > 0)
         {
             remainderFunds += remainder;
         }
-        Rewards.payHoster(address(bidStore), bidId, balanceSheet);
-    }
-
-    /** addValidation(int, bool)
-     *  @dev Add a Validation to a bid
-     *  @param bidId    The ID of the bid to be validated
-     *  @param isValid  If the validator marked the pin as valid
-     */
-    function addValidation(int bidId, bool isValid)
-    internal
-    {
-        require(bidStore.isPinned(bidId), "not open");
-        require(bidStore.addValidation(bidId, msg.sender, isValid), "add failed");
-
-        uint whenPinned = bidStore.getPinned(bidId);
-        uint durationSeconds = bidStore.getDuration(bidId);
-        if (Rewards.durationHasPassed(whenPinned, durationSeconds))
-        {
-            payout(bidId);
-        }
-
-        emit ValidationOcurred(bidId, msg.sender, isValid);
-    }
+        Rewards.payHoster(address(bidStore), bidID, balanceSheet);
+    }*/
 
     /** validateBid(bytes32, int64, uint, uint, uint, int16)
      *  @dev Validate bid() input values
@@ -564,25 +531,20 @@ contract Scatter is Owned {  /// interface: IScatter
      *  @param fileSize         The size of the file in bytes
      *  @param durationSeconds  The requested duration of the IPFS pin
      *  @param bidValue         The value provided to compensate the hoster
-     *  @param validationPool   The value to be split between validators
-     *  @param minValidations   The minimum amount of majority validations
      *  @return bool            If the values passed validation
      */
     function validateBid(
         bytes32 fileHash,
-        int64 fileSize,
+        uint64 fileSize,
         uint durationSeconds,
-        uint bidValue,
-        uint validationPool,
-        int16 minValidations
+        uint bidValue
     ) internal view returns (bool)
     {
         if (
-            msg.value < bidValue.add(validationPool)
+            msg.value < bidValue
             || fileHash == bytes32(0) || fileSize < 1
             || fileHash == EMPTY_IPFS_FILE
             || bidValue < 1
-            || validationPool < uint(minValidations)
             || bidValue < env.getuint(ENV_MIN_BID)
             || durationSeconds < env.getuint(ENV_MIN_DURATION)
         )

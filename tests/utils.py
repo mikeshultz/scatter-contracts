@@ -41,14 +41,12 @@ def topic_signature(abi):
         return None
     args = ','.join([a.get('type') for a in abi.get('inputs')])
     sig = '{}({})'.format(abi.get('name'), args)
-    print("topic_signature: {}".format(sig))
     return Web3.sha3(text=sig)
 
 
 def event_topics(web3contract):
     """ Process a Web3.py Contract and return a dict of event topic sigs """
     contract_abi = web3contract.abi
-    events = []
     sigs = AttrDict({})
 
     for abi in contract_abi:
@@ -80,6 +78,8 @@ def get_event(web3contract, event_name, rcpt):
 
 def has_event(web3contract, event_name, rcpt):
     abi = event_abi(web3contract.abi, event_name)
+    if abi is None:
+        raise ValueError("Did not find {} in contract ABI.".format(event_name))
     sig = HexBytes(topic_signature(abi).hex())
     for log in rcpt.logs:
         if len(log.topics) > 0 and log.topics[0] == sig:
