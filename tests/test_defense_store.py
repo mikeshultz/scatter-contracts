@@ -1,4 +1,5 @@
 """ Tests for ChallengeStore """
+import pytest
 from datetime import datetime
 from eth_utils import remove_0x_prefix, add_0x_prefix
 from hexbytes import HexBytes
@@ -16,6 +17,10 @@ from .consts import (
 
 def test_add_defense(web3, contracts):
     """ Test a simple addDefense """
+
+    if web3.is_eth_tester:
+        pytest.skip("eth_sign is not currently supported by eth_tester")
+
     owner, defender, _, _, _, _, Scatter = get_accounts(web3)
 
     defenseStore = contracts.get(DEFENSE_STORE_CONTRACT_NAME)

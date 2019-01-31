@@ -1,4 +1,5 @@
 """ Tests for ChallengeStore """
+import pytest
 from datetime import datetime
 from hexbytes import HexBytes
 from eth_utils import add_0x_prefix, remove_0x_prefix
@@ -49,6 +50,10 @@ def test_assemble_hash(web3, contracts):
 def test_challenge(web3, contracts):
     """ Test the challenge process. Basically an integration test because it leans on all storage
     """
+
+    if web3.is_eth_tester:
+        pytest.skip("eth_sign is not currently supported by eth_tester")
+
     owner, bidder, pinner1, pinner2, _, _, _ = get_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
@@ -211,6 +216,10 @@ def test_challenge(web3, contracts):
 def test_mad(web3, contracts):
     """ Test the Mutually Assured Destruction mechanic
     """
+
+    if web3.is_eth_tester:
+        pytest.skip("eth_sign is not currently supported by eth_tester")
+
     owner, bidder, pinner1, pinner2, _, _, _ = get_accounts(web3)
 
     scatter = contracts.get(MAIN_CONTRACT_NAME)
