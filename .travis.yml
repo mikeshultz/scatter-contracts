@@ -1,0 +1,20 @@
+language: python
+python: 
+  - 3.6
+env:
+  - SCRIPT='sb test test'
+install:
+  - pip install -r requirements.txt
+  - pip install -e .
+  - sb accounts create -p asdf1234
+  - sb accounts default $(sb accounts list 2> /dev/null | egrep -o '(0x[A-Fa-f0-9]+)')
+jobs:  
+  include:
+    - stage: "test-lint"
+      matrix:
+        include:
+          - python: 3.6
+      env: 
+        - SCRIPT="flake8 --config .flake8"
+
+script: $SCRIPT
